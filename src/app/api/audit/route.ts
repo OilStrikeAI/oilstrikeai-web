@@ -99,6 +99,8 @@ export async function POST(request: Request) {
           title: d.title,
           explanation: d.explanation,
           amount: normalizeAmount(d.amount),
+          recurrence_basis: d.recurrence_basis,
+          stakes: normalize(d.stakes),
           page_reference: d.page_reference,
           note: normalize(d.note),
           suggested_next_step: d.suggested_next_step,

@@ -31,6 +31,8 @@ export type AuditDiscrepancy = {
   title: string;
   explanation: string;
   amount: number;
+  recurrence_basis: Recurrence;
+  stakes: string;
   page_reference: string;
   note: string;
   suggested_next_step: string;
@@ -85,6 +87,11 @@ Never output or imply a confidence percentage. If a clause is genuinely ambiguou
 ## Trade pricing notation
 Oil trading and resale contracts sometimes write price as "$X/Y" (for example "$650/10"). This is standard trade notation meaning the base price is $X per unit, and $Y per unit is conceded to an intermediary or facilitator. It is NOT an ambiguous or garbled number and should never be flagged as such. When quantity is known, compute the implied total intermediary commission (Y × quantity) and mention it in the explanation if it is material.
 
+## Showing real value, honestly — hard rule
+Every discrepancy must include a "stakes" sentence: one concise, honest sentence stating what is genuinely protected or at risk if this finding is acted on. This is NOT a place to invent urgency or exaggerate — it must be something you can defend from the document. For a financial finding, restate the dollar stake in plain words (e.g. "Correcting this recovers the $22,500 overbilled this cycle"). For a legal, operational, or fraud_risk finding with no dollar figure, describe the concrete real-world stake instead of a dollar amount (e.g. "Protects your right to elect non-consent within the required window" or "Prevents a payment from being routed to an unverified third party"). Never write a vague filler sentence — always name the specific thing at stake.
+
+"recurrence_basis" must be "none" UNLESS the document itself explicitly shows this is a recurring cycle — for example the document is titled or described as a monthly/quarterly JIB, cost recovery statement, or the clause itself states a recurring cadence. When the document clearly states a cadence, set "recurrence_basis" to that cadence so a one-time dollar finding can be honestly annotated as "per cycle" rather than a one-off. Never guess or assume recurrence just because the document type is normally recurring in the industry — only set it when the document itself says so.
+
 ## Key dates & deadlines
 Extract every deadline, recurring duty, and time-bound obligation into "obligations" — not just discrepancies. Compute an absolute due_date (YYYY-MM-DD) whenever you can anchor it to a stated effective date or explicit calendar date in the document. If a duty is real but you cannot anchor it to a specific date, still include it with due_date as "" and explain the timing basis in the title.
 
@@ -120,6 +127,15 @@ const RECORD_FINDINGS_TOOL = {
             title: { type: "string" },
             explanation: { type: "string" },
             amount: { type: "number", description: "0 if no dollar figure applies" },
+            recurrence_basis: {
+              type: "string",
+              enum: ["none", "monthly", "quarterly", "annual"],
+              description: "Only set when the document itself explicitly states this cadence — never assumed.",
+            },
+            stakes: {
+              type: "string",
+              description: "One honest sentence naming what is specifically protected or at risk — never invented or vague.",
+            },
             page_reference: { type: "string" },
             note: { type: "string", description: "\"\" if nothing uncertain to flag" },
             suggested_next_step: {
@@ -133,6 +149,8 @@ const RECORD_FINDINGS_TOOL = {
             "title",
             "explanation",
             "amount",
+            "recurrence_basis",
+            "stakes",
             "page_reference",
             "note",
             "suggested_next_step",

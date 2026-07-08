@@ -27,8 +27,17 @@ const CATEGORY_LABELS: Record<string, string> = {
   fraud_risk: "Fraud Risk Indicator",
 };
 
+const CYCLES_PER_YEAR: Record<string, number> = { monthly: 12, quarterly: 4, annual: 1 };
+
+const RECURRENCE_LABELS: Record<string, string> = {
+  monthly: "monthly billing cycle stated in this document",
+  quarterly: "quarterly billing cycle stated in this document",
+  annual: "annual cycle stated in this document",
+};
+
 function DiscrepancyCard({ d }: { d: DiscrepancyRow }) {
   const isFraud = d.category === "fraud_risk";
+  const hasAmount = Boolean(d.amount);
   return (
     <div
       className={`rounded-xl border p-6 shadow-[var(--shadow-card)] ${
@@ -47,13 +56,26 @@ function DiscrepancyCard({ d }: { d: DiscrepancyRow }) {
           </div>
           <p className="mt-2 font-semibold text-white">{d.title}</p>
         </div>
-        {d.amount ? (
-          <p className="font-display whitespace-nowrap text-2xl font-semibold text-gold">
-            ${d.amount.toLocaleString("en-US")}
-          </p>
+        {hasAmount ? (
+          <div className="text-right">
+            <p className="font-display whitespace-nowrap text-2xl font-semibold text-gold">
+              ${d.amount!.toLocaleString("en-US")}
+            </p>
+            {d.recurrence_basis !== "none" && (
+              <p className="text-xs text-white/40">per {d.recurrence_basis.replace("ly", "")} cycle</p>
+            )}
+          </div>
         ) : null}
       </div>
       <p className="mt-3 text-sm text-white/70">{d.explanation}</p>
+      {d.stakes && (
+        <p className="mt-3 text-sm text-white/80">
+          <span className="font-semibold text-white">
+            {hasAmount ? "In plain terms: " : "What this protects: "}
+          </span>
+          {d.stakes}
+        </p>
+      )}
       <p className="mt-3 text-xs text-white/40">
         Reference in original document: {d.page_reference || "n/a"}
       </p>
@@ -95,6 +117,15 @@ export default async function ReportPage({
   }
 
   const total = data.discrepancies.reduce((sum, d) => sum + (d.amount || 0), 0);
+  const recurringFindings = data.discrepancies.filter(
+    (d) => d.amount && d.recurrence_basis !== "none"
+  );
+  const projectedAnnual = recurringFindings.reduce(
+    (sum, d) => sum + d.amount! * CYCLES_PER_YEAR[d.recurrence_basis],
+    0
+  );
+  const dominantCadence = recurringFindings[0]?.recurrence_basis;
+  const nonDollarFindings = data.discrepancies.filter((d) => !d.amount);
   const openObligations = data.obligations.filter((o) => o.status === "open");
 
   return (
@@ -110,10 +141,34 @@ export default async function ReportPage({
         </p>
 
         <div className="mt-8 rounded-2xl border-2 border-gold bg-navy-light p-8 text-center shadow-[var(--shadow-gold)]">
-          <p className="text-white/60">Total discrepancies found</p>
+          <p className="text-white/60">Confirmed discrepancies found</p>
           <p className="mt-2 font-display text-5xl font-semibold text-gold">
             ${total.toLocaleString("en-US")}
           </p>
+          <p className="mt-2 text-xs text-white/40">
+            Every dollar here is tied to a specific clause and page — nothing estimated or rounded up.
+          </p>
+
+          {projectedAnnual > total && dominantCadence && (
+            <p className="mx-auto mt-5 max-w-md rounded-lg border border-white/10 bg-navy px-4 py-3 text-sm text-white/70">
+              <span className="font-semibold text-white">Estimate, not a guarantee: </span>
+              if the same pattern continues, this could be roughly{" "}
+              <span className="font-semibold text-gold">
+                ${Math.round(projectedAnnual).toLocaleString("en-US")}/year
+              </span>{" "}
+              — based on the {RECURRENCE_LABELS[dominantCadence]}, not a made-up multiplier.
+            </p>
+          )}
+
+          {nonDollarFindings.length > 0 && (
+            <p className="mt-4 text-sm text-white/60">
+              Plus <span className="font-semibold text-white">{nonDollarFindings.length}</span>{" "}
+              additional legal, operational, or fraud-risk finding
+              {nonDollarFindings.length === 1 ? "" : "s"} below with no dollar figure attached — each
+              one still names exactly what it protects you from.
+            </p>
+          )}
+
           <p className="mt-3 text-sm text-white/40">
             This audit would normally cost $6,000&ndash;$12,000 from a lawyer or
             forensic accountant. You got it for free.

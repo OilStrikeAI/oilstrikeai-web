@@ -10,6 +10,8 @@ export type DiscrepancyRow = {
   title: string;
   explanation: string;
   amount: number | null;
+  recurrence_basis: Recurrence;
+  stakes: string | null;
   page_reference: string | null;
   note: string | null;
   suggested_next_step: string | null;
