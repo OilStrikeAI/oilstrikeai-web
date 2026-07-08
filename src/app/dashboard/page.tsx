@@ -76,6 +76,12 @@ function DashboardContent() {
               Team
             </Link>
             <Link
+              href="/dashboard/billing"
+              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-white/70 transition hover:bg-white/10 hover:text-white"
+            >
+              Billing
+            </Link>
+            <Link
               href="/dashboard/chat"
               className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-white/70 transition hover:bg-white/10 hover:text-white"
             >
