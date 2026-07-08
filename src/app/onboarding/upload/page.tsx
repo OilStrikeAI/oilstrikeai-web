@@ -41,6 +41,7 @@ export default function UploadPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lineIndex, setLineIndex] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const rawLead = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const lead: Lead = rawLead
@@ -52,6 +53,12 @@ export default function UploadPage() {
     const t = setInterval(() => {
       setLineIndex((i) => (i + 1 < narration.length ? i + 1 : i));
     }, 2200);
+    return () => clearInterval(t);
+  }, [submitting]);
+
+  useEffect(() => {
+    if (!submitting) return;
+    const t = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
     return () => clearInterval(t);
   }, [submitting]);
 
@@ -78,6 +85,7 @@ export default function UploadPage() {
     setSubmitting(true);
     setError(null);
     setLineIndex(0);
+    setElapsedSeconds(0);
 
     try {
       const formData = new FormData();
@@ -106,9 +114,15 @@ export default function UploadPage() {
       <div className="flex min-h-screen flex-col bg-navy">
         <OnboardingHeader step={3} />
         <main className="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center px-6 py-16">
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-white">
-            Analyzing your document...
-          </h1>
+          <div className="flex items-baseline justify-between gap-4">
+            <h1 className="font-display text-3xl font-semibold tracking-tight text-white">
+              Analyzing your document...
+            </h1>
+            <span className="font-mono text-2xl font-semibold text-gold">
+              {String(Math.floor(elapsedSeconds / 60)).padStart(2, "0")}:
+              {String(elapsedSeconds % 60).padStart(2, "0")}
+            </span>
+          </div>
           <p className="mt-3 text-white/60">
             This usually takes under a minute. Don&apos;t close this tab.
           </p>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import OnboardingHeader from "@/components/OnboardingHeader";
 import TierRecommendation from "@/components/TierRecommendation";
+import ReportActions from "@/components/ReportActions";
 import { getTrialAuditData, type DiscrepancyRow } from "@/lib/auditData";
 
 export const metadata: Metadata = {
@@ -171,9 +172,14 @@ export default async function ReportPage({
 
           <p className="mt-3 text-sm text-white/40">
             This audit would normally cost $6,000&ndash;$12,000 from a lawyer or
-            forensic accountant. You got it for free.
+            forensic accountant, and typically takes them 8&ndash;15 hours.
+            {data.document?.analysis_duration_seconds
+              ? ` You got it for free in ${Math.round(data.document.analysis_duration_seconds)} seconds.`
+              : " You got it for free."}
           </p>
         </div>
+
+        <ReportActions auditId={data.company.id} />
 
         <h2 className="mt-12 font-display text-xl font-semibold text-white">
           Findings ({data.discrepancies.length})

@@ -30,7 +30,12 @@ export type ObligationRow = {
 
 export type AuditData = {
   company: { id: string; name: string; contact_name: string | null };
-  document: { id: string; file_name: string; document_type: string } | null;
+  document: {
+    id: string;
+    file_name: string;
+    document_type: string;
+    analysis_duration_seconds: number | null;
+  } | null;
   contract: {
     id: string;
     contract_number: string | null;
@@ -59,7 +64,7 @@ export async function getTrialAuditData(companyId: string): Promise<AuditData | 
 
   const { data: document } = await admin
     .from("documents")
-    .select("id, file_name, document_type")
+    .select("id, file_name, document_type, analysis_duration_seconds")
     .eq("company_id", companyId)
     .order("created_at", { ascending: false })
     .limit(1)

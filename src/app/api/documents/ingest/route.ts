@@ -32,7 +32,9 @@ export async function POST(request: Request) {
 
     const arrayBuffer = await file.arrayBuffer();
     const pdfBase64 = Buffer.from(arrayBuffer).toString("base64");
+    const analysisStartedAt = Date.now();
     const findings = await analyzeDocument({ fileName: file.name, pdfBase64 });
+    const analysisDurationSeconds = (Date.now() - analysisStartedAt) / 1000;
 
     const { data: document, error: documentError } = await supabase
       .from("documents")
@@ -43,6 +45,7 @@ export async function POST(request: Request) {
         storage_path: file.name,
         document_type: findings.document_type,
         status: "analyzed",
+        analysis_duration_seconds: analysisDurationSeconds,
       })
       .select("id")
       .single();

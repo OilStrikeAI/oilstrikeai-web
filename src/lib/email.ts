@@ -8,6 +8,7 @@ export async function sendEmail(params: {
   to: string;
   subject: string;
   html: string;
+  attachment?: { filename: string; content: Buffer };
 }): Promise<{ sent: boolean; reason?: string }> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.REMINDERS_FROM_EMAIL;
@@ -30,6 +31,16 @@ export async function sendEmail(params: {
       to: params.to,
       subject: params.subject,
       html: params.html,
+      ...(params.attachment
+        ? {
+            attachments: [
+              {
+                filename: params.attachment.filename,
+                content: params.attachment.content.toString("base64"),
+              },
+            ],
+          }
+        : {}),
     }),
   });
 
