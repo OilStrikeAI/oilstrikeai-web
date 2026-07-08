@@ -11,8 +11,12 @@ export default function Footer() {
           <Link href="/login" className="hover:text-white">
             Log In
           </Link>
-          <span>Privacy Policy</span>
-          <span>Terms of Service</span>
+          <Link href="/privacy" className="hover:text-white">
+            Privacy Policy
+          </Link>
+          <Link href="/terms" className="hover:text-white">
+            Terms of Service
+          </Link>
         </div>
       </div>
     </footer>
