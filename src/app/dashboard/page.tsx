@@ -2,17 +2,15 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import {
   discrepancies,
   obligations,
-  riskScore,
   rankObligations,
 } from "@/lib/mockData";
 import { usePageTitle } from "@/lib/usePageTitle";
 import CommandBar from "@/components/CommandBar";
 import NotificationBell from "@/components/NotificationBell";
-import RiskTrendChart from "@/components/RiskTrendChart";
 import ForecastPanel from "@/components/ForecastPanel";
 import ConsequenceChain from "@/components/ConsequenceChain";
 import ConflictMap from "@/components/ConflictMap";
@@ -111,34 +109,56 @@ export default function DashboardPage() {
 }
 
 function RiskScoreCard() {
-  const delta = riskScore.current - riskScore.previous;
+  const [summary, setSummary] = useState<{ score: number; totalRecovered: number; openItems: number } | null>(
+    null
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  const loadSummary = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const res = await fetch("/api/dashboard/summary", { signal });
+      const json = await res.json();
+      if (signal?.aborted) return;
+      if (!res.ok) throw new Error(json.error || "Could not load your risk score.");
+      setSummary(json);
+    } catch (err) {
+      if (!signal?.aborted) setError(err instanceof Error ? err.message : "Could not load your risk score.");
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    // Fetch-on-mount with an abort-controlled cleanup — setState only runs
+    // after the awaited fetch resolves, never synchronously.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadSummary(controller.signal);
+    return () => controller.abort();
+  }, [loadSummary]);
+
   return (
     <div className="rounded-2xl border border-gold/30 bg-navy-light p-8 shadow-[var(--shadow-gold)]">
       <p className="text-sm text-white/50">Risk Exposure Score</p>
+      {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
       <div className="mt-2 flex items-baseline gap-3">
         <span className="font-display text-6xl font-semibold text-gold">
-          {riskScore.current}
+          {summary ? summary.score : "—"}
         </span>
         <span className="text-white/40">/100</span>
-        <span className="rounded-full bg-money-green/20 px-2 py-1 text-xs font-semibold text-money-green">
-          +{delta} this week
-        </span>
       </div>
+      <p className="mt-1 text-xs text-white/30">
+        Computed from your real open items — 100 minus a fixed penalty per open finding/obligation, by severity.
+      </p>
       <div className="mt-6 grid grid-cols-2 gap-4 border-t border-white/10 pt-6">
         <div>
           <p className="font-display text-2xl font-semibold text-white">
-            ${riskScore.totalRecovered.toLocaleString("en-US")}
+            ${(summary?.totalRecovered ?? 0).toLocaleString("en-US")}
           </p>
-          <p className="text-xs text-white/40">Recovered since day one</p>
+          <p className="text-xs text-white/40">Recovered (resolved findings)</p>
         </div>
         <div>
-          <p className="font-display text-2xl font-semibold text-white">{riskScore.openItems}</p>
+          <p className="font-display text-2xl font-semibold text-white">{summary?.openItems ?? "—"}</p>
           <p className="text-xs text-white/40">Open items need attention</p>
         </div>
-      </div>
-      <div className="mt-6 border-t border-white/10 pt-6">
-        <p className="mb-2 text-xs text-white/40">Last 12 weeks</p>
-        <RiskTrendChart />
       </div>
     </div>
   );
