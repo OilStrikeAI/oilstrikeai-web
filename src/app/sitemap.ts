@@ -15,6 +15,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     },
     {
+      url: "https://oilstrikeai.com/contact",
+      lastModified: new Date(),
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+    {
       url: "https://oilstrikeai.com/terms",
       lastModified: new Date(),
       changeFrequency: "yearly",
