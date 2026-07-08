@@ -31,6 +31,45 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "File is too large. Please upload a PDF under 15MB." }, { status: 400 });
     }
 
+    const admin = createAdminClient();
+
+    // Rate limiting, checked before spending a real Claude API call:
+    // one free audit per email, ever, and one per company name per day (so
+    // switching emails to re-run the same company doesn't bypass the limit).
+    const { data: existingByEmail } = await admin
+      .from("companies")
+      .select("id")
+      .eq("is_trial", true)
+      .eq("contact_email", email)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingByEmail) {
+      return NextResponse.json(
+        { error: "This email address has already used its free Discovery Audit." },
+        { status: 400 }
+      );
+    }
+
+    if (companyName) {
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: existingByCompany } = await admin
+        .from("companies")
+        .select("id")
+        .eq("is_trial", true)
+        .ilike("name", companyName)
+        .gte("created_at", twentyFourHoursAgo)
+        .limit(1)
+        .maybeSingle();
+
+      if (existingByCompany) {
+        return NextResponse.json(
+          { error: "This company already requested a free Discovery Audit earlier today. Please book a call for full access." },
+          { status: 400 }
+        );
+      }
+    }
+
     const arrayBuffer = await file.arrayBuffer();
     const pdfBase64 = Buffer.from(arrayBuffer).toString("base64");
 
@@ -38,7 +77,16 @@ export async function POST(request: Request) {
     const findings = await analyzeDocument({ fileName: file.name, pdfBase64 });
     const analysisDurationSeconds = (Date.now() - analysisStartedAt) / 1000;
 
-    const admin = createAdminClient();
+    if (!findings.is_analyzable) {
+      return NextResponse.json(
+        {
+          error:
+            findings.rejection_reason ||
+            "We couldn't find enough oil & gas contract or billing content in this document to analyze.",
+        },
+        { status: 400 }
+      );
+    }
 
     const { data: company, error: companyError } = await admin
       .from("companies")

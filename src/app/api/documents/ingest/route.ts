@@ -36,6 +36,17 @@ export async function POST(request: Request) {
     const findings = await analyzeDocument({ fileName: file.name, pdfBase64 });
     const analysisDurationSeconds = (Date.now() - analysisStartedAt) / 1000;
 
+    if (!findings.is_analyzable) {
+      return NextResponse.json(
+        {
+          error:
+            findings.rejection_reason ||
+            "We couldn't find enough oil & gas contract or billing content in this document to analyze.",
+        },
+        { status: 400 }
+      );
+    }
+
     const { data: document, error: documentError } = await supabase
       .from("documents")
       .insert({

@@ -47,6 +47,8 @@ export type AuditObligation = {
 };
 
 export type AuditFindings = {
+  is_analyzable: boolean;
+  rejection_reason: string;
   document_type: DocumentType;
   contract_number: string;
   parties: string[];
@@ -60,6 +62,12 @@ export type AuditFindings = {
 const SYSTEM_PROMPT = `You are the OilStrikeAI Document Analysis System. You read oil & gas contracts and billing statements (PSC, JOA, TSA, CPA, SPA, JIB, and related documents) for African oil & gas operators and their partners, and you surface the money, deadlines, and risks a busy person would miss.
 
 Write in good, plain, professional English. Not dumbed down, not legalese — the way a sharp contracts manager would explain something to a colleague. Every sentence must be something you can defend by pointing at the actual text of the document.
+
+## Is this even analyzable? — check this first
+Before doing anything else, decide whether this document is genuinely something you can produce a real audit from. Set "is_analyzable" to false, and explain why in plain language in "rejection_reason", if EITHER of these is true:
+- The document has nothing to do with oil & gas contracts, joint venture billing, or related commercial/legal agreements (e.g. it's an unrelated file, a personal document, an image with no real text, a resume, a receipt for something unrelated).
+- The document is genuinely too short, blank, or low-content to support any real finding (e.g. a cover page only, a single paragraph, a corrupted/empty scan).
+When "is_analyzable" is false, leave "discrepancies" and "obligations" as empty arrays and "executive_summary" as "" — do not force a finding out of a document that doesn't support one. When "is_analyzable" is true, set "rejection_reason" to "".
 
 ## How to read the document
 Read the entire document before producing any findings. Then, before you finalize your answer, re-read it a second time specifically to verify: every dollar amount you are about to cite, every page reference, every clause number, and every quoted phrase. Do not include a finding unless you can point to the exact text that supports it. If you cannot verify something on the second pass, either drop it or soften it into a plain-language caveat in the "note" field — never invent a number or a citation to fill a gap.
@@ -108,6 +116,14 @@ const RECORD_FINDINGS_TOOL = {
   input_schema: {
     type: "object" as const,
     properties: {
+      is_analyzable: {
+        type: "boolean",
+        description: "false if this document is unrelated to oil & gas contracts/billing, or has too little content to analyze.",
+      },
+      rejection_reason: {
+        type: "string",
+        description: "Plain-language reason when is_analyzable is false; \"\" otherwise.",
+      },
       document_type: {
         type: "string",
         enum: ["JOA", "PSC", "TSA", "CPA", "SPA", "JIB", "other"],
@@ -173,6 +189,8 @@ const RECORD_FINDINGS_TOOL = {
       },
     },
     required: [
+      "is_analyzable",
+      "rejection_reason",
       "document_type",
       "contract_number",
       "parties",
