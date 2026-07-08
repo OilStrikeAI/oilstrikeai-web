@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Both are already on Next.js's built-in externals list, but Turbopack
+  // wasn't honoring that implicitly — bundling @sparticuz/chromium relocated
+  // it and broke its __dirname-relative lookup of its own bin/ folder
+  // ("must externalize @sparticuz/chromium so it is not relocated").
+  // Declaring it explicitly forces native `require` instead of bundling.
+  serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core"],
   // @sparticuz/chromium ships its Chromium binary as large .br files under
   // bin/, loaded dynamically at runtime (not via a static import), so
   // Next.js's file tracing misses them unless explicitly included — without
