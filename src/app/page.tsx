@@ -3,9 +3,42 @@ import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import { pricingTiers, faqs } from "@/lib/mockData";
 
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      name: "OilStrikeAI",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      description:
+        "AI that reads oil & gas contracts and billing statements to catch overbilling and track every deadline, cited to source.",
+      offers: {
+        "@type": "AggregateOffer",
+        priceCurrency: "USD",
+        lowPrice: "1500",
+        highPrice: "6000",
+      },
+      url: "https://oilstrikeai.com",
+    },
+    {
+      "@type": "FAQPage",
+      mainEntity: faqs.map((f) => ({
+        "@type": "Question",
+        name: f.q,
+        acceptedAnswer: { "@type": "Answer", text: f.a },
+      })),
+    },
+  ],
+};
+
 export default function Home() {
   return (
     <div className="min-h-screen bg-navy">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
       <Nav />
 
       {/* Hero */}

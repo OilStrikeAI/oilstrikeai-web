@@ -6,7 +6,15 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/dashboard", "/onboarding", "/login"],
+        disallow: [
+          "/dashboard",
+          "/onboarding",
+          "/login",
+          "/admin",
+          "/api",
+          "/create-account",
+          "/auth",
+        ],
       },
     ],
     sitemap: "https://oilstrikeai.com/sitemap.xml",
