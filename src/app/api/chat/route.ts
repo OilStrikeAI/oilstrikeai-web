@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUserAndCompany } from "@/lib/serverAuth";
 import { askAssistant, type ChatMessage } from "@/lib/chatAssistant";
+import { logError } from "@/lib/errorLog";
 
 export const maxDuration = 60;
 const HISTORY_LIMIT = 30;
@@ -87,6 +88,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ answer });
   } catch (err) {
     console.error("[/api/chat] failed:", err);
+    await logError("/api/chat", err, profile.company_id);
     const message = err instanceof Error ? err.message : "Something went wrong. Please try again.";
     return NextResponse.json({ error: message }, { status: 500 });
   }

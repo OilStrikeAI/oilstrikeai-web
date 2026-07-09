@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getStripeClient } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logError } from "@/lib/errorLog";
 
 export async function POST(request: Request) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -80,6 +81,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   } catch (err) {
     console.error("[/api/billing/webhook] failed to process event:", err);
+    await logError("/api/billing/webhook", err);
     return NextResponse.json({ error: "Failed to process webhook." }, { status: 500 });
   }
 }

@@ -16,20 +16,34 @@ type Company = {
   created_at: string;
 };
 
+type ErrorLogEntry = {
+  id: string;
+  route: string;
+  message: string;
+  company_id: string | null;
+  created_at: string;
+};
+
 export default function AdminPage() {
   usePageTitle("Founder Admin");
   const [companies, setCompanies] = useState<Company[] | null>(null);
+  const [errors, setErrors] = useState<ErrorLogEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "leads" | "paying">("all");
   const [search, setSearch] = useState("");
 
   const load = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await fetch("/api/admin/companies", { signal });
-      const json = await res.json();
+      const [companiesRes, errorsRes] = await Promise.all([
+        fetch("/api/admin/companies", { signal }),
+        fetch("/api/admin/errors", { signal }),
+      ]);
+      const companiesJson = await companiesRes.json();
+      const errorsJson = await errorsRes.json();
       if (signal?.aborted) return;
-      if (!res.ok) throw new Error(json.error || "Could not load companies.");
-      setCompanies(json.companies);
+      if (!companiesRes.ok) throw new Error(companiesJson.error || "Could not load companies.");
+      setCompanies(companiesJson.companies);
+      if (errorsRes.ok) setErrors(errorsJson.errors);
     } catch (err) {
       if (!signal?.aborted) setError(err instanceof Error ? err.message : "Could not load companies.");
     }
@@ -178,6 +192,36 @@ export default function AdminPage() {
           </table>
           {companies !== null && visible.length === 0 && (
             <p className="p-6 text-center text-sm text-white/40">No companies match.</p>
+          )}
+        </div>
+
+        <h2 className="mt-10 font-display text-lg font-semibold text-white">Recent Errors</h2>
+        <p className="mt-1 text-sm text-white/50">
+          The last 100 production errors — no separate monitoring account needed.
+        </p>
+        <div className="mt-4 overflow-x-auto rounded-xl border border-white/10">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-navy-light text-xs uppercase tracking-wide text-white/40">
+              <tr>
+                <th className="px-4 py-3">Route</th>
+                <th className="px-4 py-3">Message</th>
+                <th className="px-4 py-3">When</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(errors ?? []).map((e) => (
+                <tr key={e.id} className="border-t border-white/5">
+                  <td className="px-4 py-3 font-mono text-xs text-gold">{e.route}</td>
+                  <td className="px-4 py-3 text-white/70">{e.message}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-white/40">
+                    {new Date(e.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {errors !== null && errors.length === 0 && (
+            <p className="p-6 text-center text-sm text-white/40">No errors recorded — clean.</p>
           )}
         </div>
       </main>

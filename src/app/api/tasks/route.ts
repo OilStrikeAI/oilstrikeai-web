@@ -4,6 +4,8 @@
 import { NextResponse } from "next/server";
 import { getCurrentUserAndCompany } from "@/lib/serverAuth";
 import { sendEmail } from "@/lib/email";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { logError } from "@/lib/errorLog";
 
 export async function GET() {
   const session = await getCurrentUserAndCompany();
@@ -91,7 +93,7 @@ export async function POST(request: Request) {
       });
     }
 
-    await supabase.from("activity_log").insert({
+    await createAdminClient().from("activity_log").insert({
       company_id: profile.company_id,
       actor: profile.full_name || "A manager",
       action: `Assigned a task to ${assignee?.full_name || "a team member"}:`,
@@ -101,6 +103,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ id: task.id });
   } catch (err) {
     console.error("[/api/tasks] failed:", err);
+    await logError("/api/tasks", err, profile.company_id);
     const message = err instanceof Error ? err.message : "Something went wrong creating the task.";
     return NextResponse.json({ error: message }, { status: 500 });
   }

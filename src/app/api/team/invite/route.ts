@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUserAndCompany } from "@/lib/serverAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logError } from "@/lib/errorLog";
 
 export async function POST(request: Request) {
   const session = await getCurrentUserAndCompany();
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: inviteError.message }, { status: 500 });
     }
 
-    await supabase.from("activity_log").insert({
+    await admin.from("activity_log").insert({
       company_id: profile.company_id,
       actor: profile.full_name || "A team member",
       action: `Invited a new ${role} to the team:`,
@@ -72,6 +73,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ invited: true });
   } catch (err) {
     console.error("[/api/team/invite] failed:", err);
+    await logError("/api/team/invite", err, profile.company_id);
     const message = err instanceof Error ? err.message : "Something went wrong sending the invite.";
     return NextResponse.json({ error: message }, { status: 500 });
   }

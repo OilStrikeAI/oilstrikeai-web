@@ -5,6 +5,8 @@
 import { NextResponse } from "next/server";
 import { getCurrentUserAndCompany } from "@/lib/serverAuth";
 import { analyzeDocument, normalize, normalizeAmount } from "@/lib/documentAnalysis";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { logError } from "@/lib/errorLog";
 
 export const maxDuration = 120;
 
@@ -124,7 +126,7 @@ export async function POST(request: Request) {
       newObligationCount = findings.obligations.length;
     }
 
-    await supabase.from("activity_log").insert({
+    await createAdminClient().from("activity_log").insert({
       company_id: profile.company_id,
       actor: "OilStrikeAI",
       action: "Analyzed new document and added to the daily queue:",
@@ -147,6 +149,7 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     console.error("[/api/documents/ingest] failed:", err);
+    await logError("/api/documents/ingest", err, profile.company_id);
     const message = err instanceof Error ? err.message : "Something went wrong analyzing your document.";
     return NextResponse.json({ error: message }, { status: 500 });
   }

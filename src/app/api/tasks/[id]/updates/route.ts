@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUserAndCompany } from "@/lib/serverAuth";
 import { sendEmail } from "@/lib/email";
+import { logError } from "@/lib/errorLog";
 
 export async function POST(request: Request, ctx: RouteContext<"/api/tasks/[id]/updates">) {
   const session = await getCurrentUserAndCompany();
@@ -74,6 +75,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/tasks/[id]/
     return NextResponse.json({ saved: true });
   } catch (err) {
     console.error("[/api/tasks/[id]/updates] failed:", err);
+    await logError("/api/tasks/[id]/updates", err, profile.company_id);
     const message = err instanceof Error ? err.message : "Something went wrong saving your update.";
     return NextResponse.json({ error: message }, { status: 500 });
   }

@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { analyzeDocument, normalize, normalizeAmount } from "@/lib/documentAnalysis";
+import { logError } from "@/lib/errorLog";
 
 export const maxDuration = 120;
 
@@ -187,6 +188,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ id: company.id, executiveSummary: findings.executive_summary });
   } catch (err) {
     console.error("[/api/audit] failed:", err);
+    await logError("/api/audit", err);
     const message = err instanceof Error ? err.message : "Something went wrong analyzing your document.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
