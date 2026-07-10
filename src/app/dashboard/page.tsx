@@ -3,11 +3,6 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
-import {
-  discrepancies,
-  obligations,
-  rankObligations,
-} from "@/lib/mockData";
 import { usePageTitle } from "@/lib/usePageTitle";
 import CommandBar from "@/components/CommandBar";
 import NotificationBell from "@/components/NotificationBell";
@@ -15,17 +10,80 @@ import ForecastPanel from "@/components/ForecastPanel";
 import ConsequenceChain from "@/components/ConsequenceChain";
 import ConflictMap from "@/components/ConflictMap";
 import ActivityLog from "@/components/ActivityLog";
-import PresenceBadge from "@/components/PresenceBadge";
-import ExplainabilityDrawer from "@/components/ExplainabilityDrawer";
+import ExplainabilityDrawer, { type RealDiscrepancy } from "@/components/ExplainabilityDrawer";
 import DailyQueue from "@/components/DailyQueue";
 
 type Role = "director" | "manager" | "employee";
+
+type RealObligation = {
+  id: string;
+  title: string;
+  due_date: string | null;
+  severity: "high" | "medium" | "low";
+  assigned_team: string;
+  status: string;
+};
+
+function daysUntil(dateStr: string | null): number | null {
+  if (!dateStr) return null;
+  const due = new Date(`${dateStr}T00:00:00Z`).getTime();
+  const today = new Date();
+  const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  return Math.round((due - todayUtc) / (1000 * 60 * 60 * 24));
+}
+
+function rankObligations(items: RealObligation[]): (RealObligation & { priorityScore: number })[] {
+  const severityWeight = { high: 50, medium: 25, low: 10 };
+  return items
+    .map((o) => {
+      const due = daysUntil(o.due_date);
+      return {
+        ...o,
+        priorityScore: Math.round(severityWeight[o.severity] + (due != null ? Math.max(0, 60 - due) : 0)),
+      };
+    })
+    .sort((a, b) => b.priorityScore - a.priorityScore);
+}
+
+function useQueueData() {
+  const [discrepancies, setDiscrepancies] = useState<RealDiscrepancy[]>([]);
+  const [obligations, setObligations] = useState<RealObligation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const res = await fetch("/api/queue", { signal });
+      const json = await res.json();
+      if (signal?.aborted) return;
+      if (!res.ok) throw new Error(json.error || "Could not load your data.");
+      setDiscrepancies(json.discrepancies);
+      setObligations(json.obligations);
+    } catch (err) {
+      if (!signal?.aborted) setError(err instanceof Error ? err.message : "Could not load your data.");
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    // Fetch-on-mount with an abort-controlled cleanup — setState only runs
+    // after the awaited fetch resolves, never synchronously.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    reload(controller.signal);
+    return () => controller.abort();
+  }, [reload]);
+
+  return { discrepancies, obligations, loading, error, reload };
+}
 
 function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const role = (searchParams.get("role") as Role) || "director";
   usePageTitle(`Dashboard — ${role.charAt(0).toUpperCase()}${role.slice(1)}`);
+  const queue = useQueueData();
 
   function setRole(r: Role) {
     router.push(`/dashboard?role=${r}`);
@@ -92,9 +150,14 @@ function DashboardContent() {
 
       <main className="mx-auto max-w-6xl space-y-8 px-6 py-10">
         <DailyQueue />
-        {role === "director" && <DirectorView />}
-        {role === "manager" && <ManagerView />}
-        {role === "employee" && <EmployeeView />}
+        {queue.error && (
+          <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            {queue.error}
+          </p>
+        )}
+        {role === "director" && <DirectorView queue={queue} />}
+        {role === "manager" && <ManagerView queue={queue} />}
+        {role === "employee" && <EmployeeView queue={queue} />}
       </main>
     </div>
   );
@@ -160,100 +223,113 @@ function RiskScoreCard() {
           <p className="text-xs text-white/40">Open items need attention</p>
         </div>
       </div>
+      {summary && (
+        <p className="mt-6 border-t border-white/10 pt-6 text-sm text-white/70">
+          {summary.openItems === 0
+            ? "Nothing open right now — a genuinely clean slate."
+            : `${summary.openItems} real item${summary.openItems === 1 ? "" : "s"} need attention, ${
+                summary.totalRecovered > 0
+                  ? `and $${summary.totalRecovered.toLocaleString("en-US")} has been recovered so far.`
+                  : "none resolved yet."
+              }`}
+        </p>
+      )}
     </div>
   );
 }
 
-function DirectorView() {
+type QueueData = ReturnType<typeof useQueueData>;
+
+async function resolveDiscrepancy(id: string, reload: () => void) {
+  await fetch(`/api/discrepancies/${id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ status: "resolved" }),
+  });
+  reload();
+}
+
+function DirectorView({ queue }: { queue: QueueData }) {
+  const highSeverity = queue.obligations.filter((o) => o.severity === "high" && o.status === "open");
+
   return (
     <div className="space-y-8">
       <div>
         <h1 className="font-display text-2xl font-semibold text-white">Good morning, Director</h1>
-        <p className="mt-1 text-white/50">
-          Here&apos;s a WhatsApp-style briefing of what changed this week.
-        </p>
+        <p className="mt-1 text-white/50">Here&apos;s where things stand right now.</p>
       </div>
 
       <RiskScoreCard />
 
-      <div className="rounded-2xl border border-white/10 bg-navy-light p-6">
-        <p className="font-display text-sm font-semibold uppercase tracking-wide text-gold">
-          Weekly WhatsApp digest (sent Monday, 8:00am)
-        </p>
-        <p className="mt-3 text-white/70">
-          &ldquo;Risk score is 82, up from 75 last week. We recovered $68,000 in
-          overbilling from Partner X this week. Two items need your
-          attention — an AFE election due in 5 days, and one ambiguous
-          clause flagged for legal review.&rdquo;
-        </p>
-      </div>
-
       <div>
         <h2 className="font-display text-lg font-semibold text-white">Escalated to you</h2>
         <div className="mt-3 space-y-3">
-          {obligations
-            .filter((o) => o.severity === "high")
-            .map((o) => (
+          {queue.loading && <p className="text-sm text-white/40">Loading...</p>}
+          {!queue.loading && highSeverity.length === 0 && (
+            <p className="text-sm text-white/40">Nothing high-priority open right now.</p>
+          )}
+          {highSeverity.map((o) => {
+            const due = daysUntil(o.due_date);
+            return (
               <div key={o.id} className="flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/5 p-5">
                 <div>
                   <p className="text-white">{o.title}</p>
-                  <p className="mt-1 text-xs text-white/40">{o.clause}</p>
+                  <p className="mt-1 text-xs text-white/40">Assigned to {o.assigned_team}</p>
                 </div>
                 <span className="rounded-full bg-red-500/20 px-3 py-1 text-xs font-semibold text-red-400">
-                  Due in {o.dueInDays} days
+                  {due != null ? (due >= 0 ? `Due in ${due} days` : `${Math.abs(due)} days overdue`) : "No fixed date"}
                 </span>
               </div>
-            ))}
+            );
+          })}
         </div>
       </div>
 
       <ForecastPanel />
-
-      <button className="rounded-lg border border-white/20 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40">
-        Download Quarterly Board Report
-      </button>
     </div>
   );
 }
 
-function ManagerView() {
+function ManagerView({ queue }: { queue: QueueData }) {
+  const openDiscrepancies = queue.discrepancies.filter((d) => d.tier !== "white" || d.amount);
+
   return (
     <div className="space-y-8">
       <div>
         <h1 className="font-display text-2xl font-semibold text-white">Team Queue</h1>
-        <p className="mt-1 text-white/50">
-          Everything your team is working on, across all JVs.
-        </p>
+        <p className="mt-1 text-white/50">Everything your team is working on, across all JVs.</p>
       </div>
 
       <ConflictMap />
-
       <ConsequenceChain />
 
       <div>
-        <h2 className="font-display text-lg font-semibold text-white">Awaiting your approval</h2>
+        <h2 className="font-display text-lg font-semibold text-white">Open findings</h2>
         <div className="mt-3 space-y-3">
-          {discrepancies.map((d) => (
+          {queue.loading && <p className="text-sm text-white/40">Loading...</p>}
+          {!queue.loading && openDiscrepancies.length === 0 && (
+            <p className="text-sm text-white/40">No open findings right now.</p>
+          )}
+          {openDiscrepancies.map((d) => (
             <div key={d.id} className="rounded-xl border border-white/10 bg-navy-light p-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="font-semibold text-white">{d.partner}</p>
-                  <p className="mt-1 text-sm text-white/50">{d.clause}</p>
+                  <p className="font-semibold text-white">{d.title}</p>
+                  <p className="mt-1 text-xs uppercase tracking-wide text-white/40">{d.category}</p>
                   <p className="mt-2 text-sm text-white/70">{d.explanation}</p>
-                  <div className="mt-2">
-                    <PresenceBadge itemId={d.id} />
-                  </div>
                 </div>
-                <p className="font-display whitespace-nowrap text-xl font-semibold text-gold">
-                  ${d.amount.toLocaleString("en-US")}
-                </p>
+                {d.amount ? (
+                  <p className="font-display whitespace-nowrap text-xl font-semibold text-gold">
+                    ${d.amount.toLocaleString("en-US")}
+                  </p>
+                ) : null}
               </div>
               <div className="mt-4 flex flex-wrap gap-3">
-                <button className="rounded-lg bg-gold px-4 py-2 text-xs font-semibold text-navy transition hover:bg-gold-light focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold">
-                  Approve drafted notice
-                </button>
-                <button className="rounded-lg border border-white/20 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40">
-                  Edit first
+                <button
+                  onClick={() => resolveDiscrepancy(d.id, queue.reload)}
+                  className="rounded-lg bg-gold px-4 py-2 text-xs font-semibold text-navy transition hover:bg-gold-light focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                >
+                  Mark resolved
                 </button>
                 <ExplainabilityDrawer discrepancy={d} />
               </div>
@@ -262,48 +338,42 @@ function ManagerView() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-navy-light p-6">
-        <p className="font-display text-sm font-semibold text-white">Partner history</p>
-        <p className="mt-2 text-sm text-white/60">
-          Partner Y has been late on 4 of their last 6 payments under
-          similar clauses — consider escalating the tone of this notice.
-        </p>
-      </div>
-
       <ActivityLog />
     </div>
   );
 }
 
-function EmployeeView() {
-  const ranked = rankObligations(obligations);
+function EmployeeView({ queue }: { queue: QueueData }) {
+  const ranked = rankObligations(queue.obligations.filter((o) => o.status === "open"));
+  const openDiscrepancies = queue.discrepancies.slice(0, 2);
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="font-display text-2xl font-semibold text-white">Your tasks today</h1>
-        <p className="mt-1 text-white/50">
-          Ranked for you by urgency and deadline — not just a flat list.
-        </p>
+        <p className="mt-1 text-white/50">Ranked for you by urgency and deadline — not just a flat list.</p>
       </div>
 
       <div className="space-y-3">
-        {discrepancies.slice(0, 2).map((d) => (
+        {queue.loading && <p className="text-sm text-white/40">Loading...</p>}
+
+        {openDiscrepancies.map((d) => (
           <div key={d.id} className="rounded-xl border border-white/10 bg-navy-light p-6">
             <p className="text-white">
-              Review discrepancy: <span className="font-semibold">{d.partner}</span>
+              Review finding: <span className="font-semibold">{d.title}</span>
             </p>
             <p className="mt-2 text-sm text-white/60">{d.explanation}</p>
-            <div className="mt-4 rounded-lg bg-navy p-4 text-sm text-white/50 italic">
-              Drafted for you: &ldquo;Pursuant to {d.clause}, we have identified a
-              billing variance of ${d.amount.toLocaleString("en-US")} and request
-              adjustment on the next statement...&rdquo;
-            </div>
+            {d.suggested_next_step && (
+              <div className="mt-4 rounded-lg bg-navy p-4 text-sm text-white/60">
+                <span className="font-semibold text-white">Suggested next step: </span>
+                {d.suggested_next_step}
+              </div>
+            )}
             <div className="mt-4 flex flex-wrap gap-3">
-              <button className="rounded-lg bg-gold px-4 py-2 text-xs font-semibold text-navy transition hover:bg-gold-light focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold">
-                Send for manager approval
-              </button>
-              <button className="rounded-lg border border-white/20 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40">
+              <button
+                onClick={() => resolveDiscrepancy(d.id, queue.reload)}
+                className="rounded-lg bg-gold px-4 py-2 text-xs font-semibold text-navy transition hover:bg-gold-light focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+              >
                 Mark resolved
               </button>
               <ExplainabilityDrawer discrepancy={d} />
@@ -311,20 +381,31 @@ function EmployeeView() {
           </div>
         ))}
 
-        {ranked.slice(0, 2).map((o) => (
-          <div key={o.id} className="rounded-xl border border-white/10 bg-navy-light p-6">
-            <div className="flex items-start justify-between gap-4">
-              <p className="text-white">{o.title}</p>
-              <span className="whitespace-nowrap rounded-full bg-gold/10 px-2 py-1 text-xs font-semibold text-gold">
-                Priority {o.priorityScore}
-              </span>
+        {!queue.loading && openDiscrepancies.length === 0 && ranked.length === 0 && (
+          <p className="text-sm text-white/40">Nothing open right now.</p>
+        )}
+
+        {ranked.slice(0, 3).map((o) => {
+          const due = daysUntil(o.due_date);
+          return (
+            <div key={o.id} className="rounded-xl border border-white/10 bg-navy-light p-6">
+              <div className="flex items-start justify-between gap-4">
+                <p className="text-white">{o.title}</p>
+                <span className="whitespace-nowrap rounded-full bg-gold/10 px-2 py-1 text-xs font-semibold text-gold">
+                  Priority {o.priorityScore}
+                </span>
+              </div>
+              <p className="mt-2 text-sm text-white/60">
+                {due != null
+                  ? due >= 0
+                    ? `Coming up in ${due} days`
+                    : `${Math.abs(due)} days overdue`
+                  : "No fixed date yet"}{" "}
+                · Assigned to {o.assigned_team}
+              </p>
             </div>
-            <p className="mt-2 text-sm text-white/60">
-              Coming up in {o.dueInDays} days based on {o.clause}. We&apos;ll
-              remind you again at 7 days and 1 day out.
-            </p>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
