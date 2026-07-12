@@ -15,12 +15,11 @@ export async function GET() {
   }
   const { supabase, profile } = session;
 
-  const [{ data: openDiscrepancies }, { data: resolvedDiscrepancies }, { data: openObligations }, { data: company }] =
+  const [{ data: openDiscrepancies }, { data: resolvedDiscrepancies }, { data: openObligations }] =
     await Promise.all([
       supabase.from("discrepancies").select("tier").eq("status", "open"),
       supabase.from("discrepancies").select("amount").eq("status", "resolved"),
       supabase.from("obligations").select("severity").eq("status", "open"),
-      supabase.from("companies").select("subscription_status").eq("id", profile.company_id).maybeSingle(),
     ]);
 
   const penalty =
@@ -30,7 +29,21 @@ export async function GET() {
   const score = Math.max(0, Math.min(100, 100 - penalty));
   const totalRecovered = (resolvedDiscrepancies ?? []).reduce((sum, d) => sum + (d.amount || 0), 0);
   const openItems = (openDiscrepancies?.length ?? 0) + (openObligations?.length ?? 0);
-  const subscriptionStatus = company?.subscription_status ?? "inactive";
+
+  // Isolated from the rest: subscription_status is a newer column, and this
+  // must never take down the score/openItems calculation if that migration
+  // hasn't run yet in a given environment.
+  let subscriptionStatus = "inactive";
+  try {
+    const { data: company } = await supabase
+      .from("companies")
+      .select("subscription_status")
+      .eq("id", profile.company_id)
+      .maybeSingle();
+    if (company?.subscription_status) subscriptionStatus = company.subscription_status;
+  } catch {
+    // Column doesn't exist yet in this environment — keep the safe default.
+  }
 
   return NextResponse.json({ score, totalRecovered, openItems, subscriptionStatus });
 }
