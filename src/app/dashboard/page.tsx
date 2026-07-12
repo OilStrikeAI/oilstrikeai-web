@@ -149,6 +149,7 @@ function DashboardContent() {
       </header>
 
       <main className="mx-auto max-w-6xl space-y-8 px-6 py-10">
+        <SubscriptionBanner />
         <DailyQueue />
         {queue.error && (
           <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
@@ -168,6 +169,46 @@ export default function DashboardPage() {
     <Suspense fallback={<div className="min-h-screen bg-navy" />}>
       <DashboardContent />
     </Suspense>
+  );
+}
+
+function SubscriptionBanner() {
+  const [status, setStatus] = useState<string | null>(null);
+
+  const load = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const res = await fetch("/api/dashboard/summary", { signal });
+      const json = await res.json();
+      if (signal?.aborted) return;
+      if (res.ok) setStatus(json.subscriptionStatus);
+    } catch {
+      // Silent — a missing banner is a lot less important than the rest of the dashboard working.
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    // Fetch-on-mount with an abort-controlled cleanup — setState only runs
+    // after the awaited fetch resolves, never synchronously.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load(controller.signal);
+    return () => controller.abort();
+  }, [load]);
+
+  if (!status || ["active", "trialing"].includes(status)) return null;
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/30 bg-gold/5 px-5 py-4">
+      <p className="text-sm text-white/80">
+        You&apos;re not subscribed yet — this account can only see what&apos;s already here, nothing new comes in automatically.
+      </p>
+      <Link
+        href="/dashboard/billing"
+        className="whitespace-nowrap rounded-lg bg-gold px-4 py-2 text-xs font-semibold text-navy transition hover:bg-gold-light"
+      >
+        Subscribe
+      </Link>
+    </div>
   );
 }
 

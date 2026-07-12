@@ -34,40 +34,65 @@ export async function POST(request: Request) {
 
     const admin = createAdminClient();
 
-    // Rate limiting, checked before spending a real Claude API call:
-    // one free audit per email, ever, and one per company name per day (so
-    // switching emails to re-run the same company doesn't bypass the limit).
-    const { data: existingByEmail } = await admin
-      .from("companies")
-      .select("id")
-      .eq("is_trial", true)
-      .eq("contact_email", email)
-      .limit(1)
-      .maybeSingle();
+    // Rate limiting, checked before spending a real Claude API call. Test
+    // emails (TEST_AUDIT_EMAILS, comma-separated) get a relaxed "twice a
+    // day" cap instead of the normal customer-facing limits, so the product
+    // can be demoed/QA'd repeatedly without touching the real abuse guard.
+    const testEmails = (process.env.TEST_AUDIT_EMAILS || "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    const isTestEmail = testEmails.includes(email.toLowerCase());
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    if (existingByEmail) {
-      return NextResponse.json(
-        { error: "This email address has already used its free Discovery Audit." },
-        { status: 400 }
-      );
-    }
+    if (isTestEmail) {
+      const { count } = await admin
+        .from("companies")
+        .select("id", { count: "exact", head: true })
+        .eq("contact_email", email)
+        .gte("created_at", twentyFourHoursAgo);
 
-    if (companyName) {
-      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const { data: existingByCompany } = await admin
+      if ((count ?? 0) >= 2) {
+        return NextResponse.json(
+          { error: "Test limit reached: this test email can run 2 free audits per 24 hours." },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Real customers: one free audit per email, ever, and one per company
+      // name per day (so switching emails to re-run the same company
+      // doesn't bypass the limit).
+      const { data: existingByEmail } = await admin
         .from("companies")
         .select("id")
         .eq("is_trial", true)
-        .ilike("name", companyName)
-        .gte("created_at", twentyFourHoursAgo)
+        .eq("contact_email", email)
         .limit(1)
         .maybeSingle();
 
-      if (existingByCompany) {
+      if (existingByEmail) {
         return NextResponse.json(
-          { error: "This company already requested a free Discovery Audit earlier today. Please book a call for full access." },
+          { error: "This email address has already used its free Discovery Audit." },
           { status: 400 }
         );
+      }
+
+      if (companyName) {
+        const { data: existingByCompany } = await admin
+          .from("companies")
+          .select("id")
+          .eq("is_trial", true)
+          .ilike("name", companyName)
+          .gte("created_at", twentyFourHoursAgo)
+          .limit(1)
+          .maybeSingle();
+
+        if (existingByCompany) {
+          return NextResponse.json(
+            { error: "This company already requested a free Discovery Audit earlier today. Please book a call for full access." },
+            { status: 400 }
+          );
+        }
       }
     }
 

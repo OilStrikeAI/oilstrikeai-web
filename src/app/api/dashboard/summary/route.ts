@@ -13,13 +13,14 @@ export async function GET() {
   if (!session) {
     return NextResponse.json({ error: "You must be logged in." }, { status: 401 });
   }
-  const { supabase } = session;
+  const { supabase, profile } = session;
 
-  const [{ data: openDiscrepancies }, { data: resolvedDiscrepancies }, { data: openObligations }] =
+  const [{ data: openDiscrepancies }, { data: resolvedDiscrepancies }, { data: openObligations }, { data: company }] =
     await Promise.all([
       supabase.from("discrepancies").select("tier").eq("status", "open"),
       supabase.from("discrepancies").select("amount").eq("status", "resolved"),
       supabase.from("obligations").select("severity").eq("status", "open"),
+      supabase.from("companies").select("subscription_status").eq("id", profile.company_id).maybeSingle(),
     ]);
 
   const penalty =
@@ -29,6 +30,7 @@ export async function GET() {
   const score = Math.max(0, Math.min(100, 100 - penalty));
   const totalRecovered = (resolvedDiscrepancies ?? []).reduce((sum, d) => sum + (d.amount || 0), 0);
   const openItems = (openDiscrepancies?.length ?? 0) + (openObligations?.length ?? 0);
+  const subscriptionStatus = company?.subscription_status ?? "inactive";
 
-  return NextResponse.json({ score, totalRecovered, openItems });
+  return NextResponse.json({ score, totalRecovered, openItems, subscriptionStatus });
 }

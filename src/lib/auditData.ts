@@ -29,7 +29,7 @@ export type ObligationRow = {
 };
 
 export type AuditData = {
-  company: { id: string; name: string; contact_name: string | null };
+  company: { id: string; name: string; contact_name: string | null; contact_email: string | null };
   document: {
     id: string;
     file_name: string;
@@ -56,7 +56,7 @@ export async function getTrialAuditData(companyId: string): Promise<AuditData | 
 
   const { data: company } = await admin
     .from("companies")
-    .select("id, name, contact_name, is_trial")
+    .select("id, name, contact_name, contact_email, is_trial")
     .eq("id", companyId)
     .maybeSingle();
 

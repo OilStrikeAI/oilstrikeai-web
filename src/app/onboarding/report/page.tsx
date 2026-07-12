@@ -229,15 +229,27 @@ export default async function ReportPage({
             Want us to catch this automatically, every month?
           </h3>
           <p className="mx-auto mt-3 max-w-md text-white/60">
-            Turn this one-time audit into an always-on system — daily
-            reconciliation, deadline alerts, and board-ready reports.
+            This audit covered <span className="text-white">one document</span>. If you have other JV
+            agreements or billing statements, each one can hide its own version of what we just
+            found — this doesn&apos;t check those automatically. A subscription watches every
+            document, every cycle, without you uploading anything again.
           </p>
-          <a
-            href="mailto:hello@oilstrikeai.com?subject=Book%20a%20call%20-%20OilStrikeAI"
-            className="mt-6 inline-block rounded-lg bg-gold px-8 py-4 text-base font-semibold text-navy shadow-[var(--shadow-gold)] transition hover:bg-gold-light hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold active:translate-y-0"
-          >
-            Book a Free Call
-          </a>
+          <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              href={`/create-account?company=${data.company.id}&email=${encodeURIComponent(
+                data.company.contact_email || ""
+              )}&name=${encodeURIComponent(data.company.contact_name || "")}`}
+              className="inline-block rounded-lg bg-gold px-8 py-4 text-base font-semibold text-navy shadow-[var(--shadow-gold)] transition hover:bg-gold-light hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold active:translate-y-0"
+            >
+              Create a Free Account to Save This
+            </Link>
+            <a
+              href="mailto:hello@oilstrikeai.com?subject=Book%20a%20call%20-%20OilStrikeAI"
+              className="inline-block rounded-lg border border-white/20 px-8 py-4 text-base font-semibold text-white transition hover:bg-white/10"
+            >
+              Book a Free Call
+            </a>
+          </div>
           <TierRecommendation />
         </div>
       </main>
