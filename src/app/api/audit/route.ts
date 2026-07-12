@@ -35,9 +35,9 @@ export async function POST(request: Request) {
     const admin = createAdminClient();
 
     // Rate limiting, checked before spending a real Claude API call. Test
-    // emails (TEST_AUDIT_EMAILS, comma-separated) get a relaxed "twice a
-    // day" cap instead of the normal customer-facing limits, so the product
-    // can be demoed/QA'd repeatedly without touching the real abuse guard.
+    // emails (TEST_AUDIT_EMAILS, comma-separated) are exempt entirely, so
+    // the product can be demoed/QA'd as many times as needed without
+    // touching the real customer-facing abuse guard.
     const testEmails = (process.env.TEST_AUDIT_EMAILS || "")
       .split(",")
       .map((e) => e.trim().toLowerCase())
@@ -46,18 +46,7 @@ export async function POST(request: Request) {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
     if (isTestEmail) {
-      const { count } = await admin
-        .from("companies")
-        .select("id", { count: "exact", head: true })
-        .eq("contact_email", email)
-        .gte("created_at", twentyFourHoursAgo);
-
-      if ((count ?? 0) >= 2) {
-        return NextResponse.json(
-          { error: "Test limit reached: this test email can run 2 free audits per 24 hours." },
-          { status: 400 }
-        );
-      }
+      // No limit — intentional.
     } else {
       // Real customers: one free audit per email, ever, and one per company
       // name per day (so switching emails to re-run the same company
