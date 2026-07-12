@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { usePageTitle } from "@/lib/usePageTitle";
@@ -105,19 +104,7 @@ function BillingContent() {
   const isSubscribed = company && ["active", "trialing", "past_due"].includes(company.subscription_status);
 
   return (
-    <div className="flex min-h-screen flex-col bg-navy">
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-navy/95 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-4">
-          <Link href="/dashboard" className="font-display text-lg font-semibold text-white">
-            OilStrike<span className="italic text-gold">AI</span>
-          </Link>
-          <Link href="/dashboard" className="text-sm text-white/50 hover:text-white">
-            ← Back to dashboard
-          </Link>
-        </div>
-      </header>
-
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8">
+    <div className="mx-auto w-full max-w-3xl">
         <h1 className="font-display text-2xl font-semibold text-white">Billing</h1>
 
         {checkoutResult === "success" && (
@@ -188,14 +175,13 @@ function BillingContent() {
             </div>
           </div>
         )}
-      </main>
     </div>
   );
 }
 
 export default function BillingPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-navy" />}>
+    <Suspense fallback={null}>
       <BillingContent />
     </Suspense>
   );

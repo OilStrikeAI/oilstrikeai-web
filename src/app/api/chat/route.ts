@@ -10,12 +10,27 @@ import { logError } from "@/lib/errorLog";
 export const maxDuration = 60;
 const HISTORY_LIMIT = 30;
 
+const AI_CHAT_TIER = "large";
+
 export async function GET() {
   const session = await getCurrentUserAndCompany();
   if (!session) {
     return NextResponse.json({ error: "You must be logged in." }, { status: 401 });
   }
   const { supabase, profile } = session;
+
+  const { data: company } = await supabase
+    .from("companies")
+    .select("tier")
+    .eq("id", profile.company_id)
+    .maybeSingle();
+
+  if (company?.tier !== AI_CHAT_TIER) {
+    return NextResponse.json(
+      { error: "The AI Assistant is included on our top-tier plan. Upgrade to unlock it." },
+      { status: 403 }
+    );
+  }
 
   const { data: messages, error } = await supabase
     .from("chat_messages")
@@ -39,6 +54,19 @@ export async function POST(request: Request) {
   const { supabase, profile, user } = session;
 
   try {
+    const { data: companyGate } = await supabase
+      .from("companies")
+      .select("tier")
+      .eq("id", profile.company_id)
+      .maybeSingle();
+
+    if (companyGate?.tier !== AI_CHAT_TIER) {
+      return NextResponse.json(
+        { error: "The AI Assistant is included on our top-tier plan. Upgrade to unlock it." },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const question = (body.question as string | undefined)?.trim();
     if (!question) {

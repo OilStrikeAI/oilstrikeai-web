@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { usePageTitle } from "@/lib/usePageTitle";
 
@@ -67,19 +66,7 @@ export default function TeamPage() {
   const atLimit = maxSeats != null && seatsUsed >= maxSeats;
 
   return (
-    <div className="flex min-h-screen flex-col bg-navy">
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-navy/95 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-4">
-          <Link href="/dashboard" className="font-display text-lg font-semibold text-white">
-            OilStrike<span className="italic text-gold">AI</span>
-          </Link>
-          <Link href="/dashboard" className="text-sm text-white/50 hover:text-white">
-            ← Back to dashboard
-          </Link>
-        </div>
-      </header>
-
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8">
+    <div className="mx-auto w-full max-w-3xl">
         <h1 className="font-display text-2xl font-semibold text-white">Your Team</h1>
         <p className="mt-1 text-white/50">
           {maxSeats != null ? `${seatsUsed} of ${maxSeats} seats used.` : "Loading seat usage..."}
@@ -163,7 +150,6 @@ export default function TeamPage() {
             </div>
           ))}
         </div>
-      </main>
     </div>
   );
 }

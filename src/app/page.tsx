@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
@@ -32,6 +33,46 @@ const structuredData = {
   ],
 };
 
+const capabilityPills = [
+  "Contract Reading",
+  "JIB Reconciliation",
+  "Deadline Tracking",
+  "Team Delegation",
+  "AI Assistant",
+];
+
+const roles = [
+  {
+    name: "Director",
+    tagline: "The full picture, at a glance.",
+    desc: "See total exposure across every JV, every contract, every open finding — and where your team's attention is actually going.",
+  },
+  {
+    name: "Manager",
+    tagline: "Turn findings into action.",
+    desc: "Assign discrepancies and deadlines to the right person the moment the AI flags them, with a due date and a clear next step.",
+  },
+  {
+    name: "Employee",
+    tagline: "One worklist, no guessing.",
+    desc: "Log in to a single queue of exactly what's yours to resolve today — no digging through email threads or shared drives.",
+  },
+];
+
+function BrowserFrame({ children, title }: { children: React.ReactNode; title: string }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-white/10 bg-navy-light shadow-[var(--shadow-float)]">
+      <div className="flex items-center gap-2 border-b border-white/10 bg-white/[0.03] px-4 py-3">
+        <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+        <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+        <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+        <span className="ml-3 truncate text-xs text-white/30">{title}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export default function Home() {
   return (
     <div className="min-h-screen bg-navy">
@@ -50,27 +91,49 @@ export default function Home() {
               "radial-gradient(ellipse 60% 50% at 50% 0%, rgba(212,160,23,0.15), transparent), radial-gradient(ellipse 40% 40% at 90% 20%, rgba(212,160,23,0.08), transparent)",
           }}
         />
-        <div className="relative mx-auto max-w-6xl px-6 pt-24 pb-16 text-center">
-          <h1 className="mx-auto max-w-3xl font-display text-5xl font-semibold leading-[1.05] tracking-tight text-white md:text-6xl">
+        <div className="relative mx-auto max-w-6xl px-6 pt-24 pb-20 text-center">
+          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/10 px-4 py-1.5 text-xs font-medium text-gold">
+            <span className="h-1.5 w-1.5 rounded-full bg-gold" />
+            Built for indigenous & mid-size African operators
+          </div>
+
+          <h1 className="mx-auto mt-6 max-w-3xl font-display text-5xl font-semibold leading-[1.05] tracking-tight text-white md:text-6xl">
             Find the money hidden in your JV billing.
             <br />
             <span className="italic text-gold">Never miss another contract deadline.</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-white/60">
-          OilStrikeAI reads your PSC or JOA once and automatically reconciles every
-          JIB statement against it — catching overbilling and tracking every
-          obligation, cited back to the exact clause, every day.
-        </p>
-        <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <Link
-            href="/signup"
-            className="rounded-lg bg-gold px-8 py-4 text-base font-semibold text-navy shadow-[var(--shadow-gold)] transition hover:bg-gold-light hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold active:translate-y-0"
-          >
-            Get Your Free Discovery Audit
-          </Link>
-          <span className="text-sm text-white/40">
+            OilStrikeAI reads your PSC or JOA once and automatically reconciles every
+            JIB statement against it — catching overbilling and tracking every
+            obligation, cited back to the exact clause, every day.
+          </p>
+          <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <Link
+              href="/signup"
+              className="rounded-lg bg-gold px-8 py-4 text-base font-semibold text-navy shadow-[var(--shadow-gold)] transition hover:bg-gold-light hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold active:translate-y-0"
+            >
+              Get Your Free Discovery Audit
+            </Link>
+            <Link
+              href="/contact"
+              className="rounded-lg border border-white/20 px-8 py-4 text-base font-semibold text-white transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40"
+            >
+              Book a Call
+            </Link>
+          </div>
+          <p className="mt-4 text-sm text-white/40">
             No credit card required. We find $50K+ or it&apos;s free.
-          </span>
+          </p>
+
+          <div className="mx-auto mt-10 flex max-w-3xl flex-wrap items-center justify-center gap-3">
+            {capabilityPills.map((p) => (
+              <span
+                key={p}
+                className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5 text-xs text-white/60"
+              >
+                {p}
+              </span>
+            ))}
           </div>
         </div>
       </section>
@@ -86,29 +149,161 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Problem */}
-      <section id="product" className="mx-auto max-w-6xl px-6 py-20">
-        <div className="grid gap-10 md:grid-cols-2">
-          <div className="rounded-xl border border-white/10 bg-navy-light p-8 shadow-[var(--shadow-card)]">
-            <h3 className="font-display text-xl font-semibold text-white">
-              The JIB reconciliation grind
-            </h3>
-            <p className="mt-3 text-white/60">
-              Every month, a giant billing statement arrives from the operator.
-              A small team checks it by hand against a 150-page contract —
-              taking weeks, and errors of 2–5% routinely slip through
-              unnoticed for months.
+      {/* Feature showcase A — real screenshot */}
+      <section id="product" className="mx-auto max-w-6xl px-6 py-24">
+        <div className="grid items-center gap-14 md:grid-cols-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gold">
+              Real, cited findings
+            </p>
+            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-white">
+              A risk score you can actually trust
+            </h2>
+            <p className="mt-4 text-white/60">
+              No invented percentages, no black-box math. Your score is computed
+              straight from your real open findings and obligations — and every
+              dollar shown is money the AI has actually traced to a document,
+              never a guess.
+            </p>
+            <ul className="mt-6 space-y-3 text-sm text-white/70">
+              <li className="flex gap-2">
+                <span className="text-gold">✓</span> Computed from your real open items, not a model output
+              </li>
+              <li className="flex gap-2">
+                <span className="text-gold">✓</span> Every recovered dollar is a resolved finding, cited to source
+              </li>
+              <li className="flex gap-2">
+                <span className="text-gold">✓</span> Updates the moment a new document is analyzed
+              </li>
+            </ul>
+          </div>
+          <BrowserFrame title="oilstrikeai.com/dashboard">
+            <div className="bg-navy p-2">
+              <Image
+                src="/screenshots/risk-score.png"
+                alt="Live OilStrikeAI risk exposure score card"
+                width={1104}
+                height={340}
+                className="w-full rounded-lg"
+              />
+            </div>
+          </BrowserFrame>
+        </div>
+      </section>
+
+      {/* Feature showcase B — Daily Queue mockup */}
+      <section className="mx-auto max-w-6xl px-6 py-4">
+        <div className="grid items-center gap-14 md:grid-cols-2">
+          <div className="order-2 md:order-1">
+            <BrowserFrame title="oilstrikeai.com/dashboard">
+              <div className="space-y-3 bg-navy p-6">
+                <p className="text-xs font-semibold uppercase tracking-wide text-white/40">
+                  Daily Queue
+                </p>
+                {[
+                  { tag: "RED", title: "Overhead recovery exceeds Article 8.1 cap", amt: "$14,200" },
+                  { tag: "YELLOW", title: "Insurance certificate expires in 12 days", amt: null },
+                  { tag: "WHITE", title: "Freight allocation differs from JOA schedule", amt: "$2,100" },
+                ].map((row) => (
+                  <div
+                    key={row.title}
+                    className="flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-navy-light px-4 py-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`h-2 w-2 shrink-0 rounded-full ${
+                          row.tag === "RED"
+                            ? "bg-red-500"
+                            : row.tag === "YELLOW"
+                              ? "bg-yellow-400"
+                              : "bg-white/40"
+                        }`}
+                      />
+                      <span className="text-sm text-white/80">{row.title}</span>
+                    </div>
+                    {row.amt && <span className="shrink-0 text-sm font-semibold text-money-green">{row.amt}</span>}
+                  </div>
+                ))}
+              </div>
+            </BrowserFrame>
+          </div>
+          <div className="order-1 md:order-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gold">
+              One worklist, not five spreadsheets
+            </p>
+            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-white">
+              Everything that needs attention today, in one place
+            </h2>
+            <p className="mt-4 text-white/60">
+              New invoices, contract deadlines, and flagged discrepancies all land
+              in a single daily queue — sorted by real severity, so nothing
+              important gets buried under routine paperwork.
             </p>
           </div>
-          <div className="rounded-xl border border-white/10 bg-navy-light p-8 shadow-[var(--shadow-card)]">
-            <h3 className="font-display text-xl font-semibold text-white">
-              The buried deadline nobody was tracking
-            </h3>
-            <p className="mt-3 text-white/60">
-              Somewhere on page 120 of your JOA is a rule with a real
-              deadline. Miss it, and you&apos;re facing penalties — or in the
-              worst case, losing your rights to the field entirely.
+        </div>
+      </section>
+
+      {/* Feature showcase C — Ask AI mockup */}
+      <section className="mx-auto max-w-6xl px-6 py-24">
+        <div className="grid items-center gap-14 md:grid-cols-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gold">
+              Trained on your real data
             </p>
+            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-white">
+              Ask AI, instead of digging through PDFs
+            </h2>
+            <p className="mt-4 text-white/60">
+              Your team already knows how to type a question into ChatGPT — this
+              is the same habit, except every answer is grounded in your actual
+              contracts, billing, and deadlines, with a citation back to the
+              source.
+            </p>
+            <p className="mt-3 text-sm text-white/40">
+              Included on Tier 3 (Large/IOC-adjacent) plans.
+            </p>
+          </div>
+          <BrowserFrame title="AI Assistant">
+            <div className="space-y-3 bg-navy p-6">
+              <div className="flex justify-end">
+                <div className="max-w-[80%] rounded-2xl rounded-tr-sm bg-gold px-4 py-2.5 text-sm font-medium text-navy">
+                  What is our biggest open discrepancy?
+                </div>
+              </div>
+              <div className="flex justify-start">
+                <div className="max-w-[85%] rounded-2xl rounded-tl-sm border border-white/10 bg-navy-light px-4 py-2.5 text-sm text-white/80">
+                  Your largest open finding is a{" "}
+                  <span className="font-semibold text-money-green">$14,200</span>{" "}
+                  overhead recovery that exceeds the cap set in{" "}
+                  <span className="text-gold">Article 8.1</span> of your JOA.
+                  It&apos;s been open for 6 days.
+                </div>
+              </div>
+            </div>
+          </BrowserFrame>
+        </div>
+      </section>
+
+      {/* Built for every role */}
+      <section className="border-y border-white/10 bg-navy-light py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <h2 className="text-center font-display text-3xl font-semibold tracking-tight text-white">
+            Built for every role on your team
+          </h2>
+          <p className="mx-auto mt-3 max-w-xl text-center text-white/60">
+            One platform, with the right view for whoever&apos;s logged in.
+          </p>
+          <div className="mt-12 grid gap-6 md:grid-cols-3">
+            {roles.map((r) => (
+              <div
+                key={r.name}
+                className="rounded-2xl border border-white/10 bg-navy p-8 shadow-[var(--shadow-card)]"
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-gold">{r.name}</p>
+                <h3 className="mt-2 font-display text-xl font-semibold text-white">{r.tagline}</h3>
+                <p className="mt-3 text-sm text-white/60">{r.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -189,10 +384,10 @@ export default function Home() {
           {pricingTiers.map((tier) => (
             <div
               key={tier.name}
-              className={`rounded-2xl border p-8 ${
+              className={`rounded-2xl border p-8 transition hover:-translate-y-1 ${
                 tier.highlighted
                   ? "border-gold bg-navy-light shadow-[var(--shadow-gold)]"
-                  : "border-white/10"
+                  : "border-white/10 hover:border-white/20"
               }`}
             >
               <h3 className="font-semibold text-white">{tier.name}</h3>

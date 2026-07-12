@@ -1,19 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePageTitle } from "@/lib/usePageTitle";
-import CommandBar from "@/components/CommandBar";
-import NotificationBell from "@/components/NotificationBell";
 import ForecastPanel from "@/components/ForecastPanel";
 import ConsequenceChain from "@/components/ConsequenceChain";
 import ConflictMap from "@/components/ConflictMap";
 import ActivityLog from "@/components/ActivityLog";
 import ExplainabilityDrawer, { type RealDiscrepancy } from "@/components/ExplainabilityDrawer";
 import DailyQueue from "@/components/DailyQueue";
-
-type Role = "director" | "manager" | "employee";
+import { useDashboardSummary, type DashboardSummary } from "@/lib/dashboardContext";
 
 type RealObligation = {
   id: string;
@@ -78,124 +74,30 @@ function useQueueData() {
   return { discrepancies, obligations, loading, error, reload };
 }
 
-function DashboardContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const role = (searchParams.get("role") as Role) || "director";
-  usePageTitle(`Dashboard — ${role.charAt(0).toUpperCase()}${role.slice(1)}`);
+export default function DashboardPage() {
+  const { summary } = useDashboardSummary();
+  const role = summary?.role;
+  usePageTitle(role ? `Dashboard — ${role.charAt(0).toUpperCase()}${role.slice(1)}` : "Dashboard");
   const queue = useQueueData();
 
-  function setRole(r: Role) {
-    router.push(`/dashboard?role=${r}`);
-  }
-
   return (
-    <div className="min-h-screen bg-navy">
-      {/* Top bar */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-navy/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
-          <Link href="/" className="font-display text-lg font-semibold text-white">
-            OilStrike<span className="italic text-gold">AI</span>
-          </Link>
-
-          <div className="hidden flex-1 justify-center md:flex">
-            <CommandBar />
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="hidden items-center gap-2 sm:flex">
-              <span className="text-xs text-white/40">Viewing as:</span>
-              <div className="flex rounded-lg border border-white/10 p-1">
-                {(["director", "manager", "employee"] as Role[]).map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => setRole(r)}
-                    className={`rounded-md px-3 py-1.5 text-xs font-semibold capitalize transition ${
-                      role === r ? "bg-gold text-navy" : "text-white/50 hover:text-white"
-                    }`}
-                  >
-                    {r}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <Link
-              href="/dashboard/tasks"
-              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-white/70 transition hover:bg-white/10 hover:text-white"
-            >
-              Tasks
-            </Link>
-            <Link
-              href="/dashboard/team"
-              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-white/70 transition hover:bg-white/10 hover:text-white"
-            >
-              Team
-            </Link>
-            <Link
-              href="/dashboard/billing"
-              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-white/70 transition hover:bg-white/10 hover:text-white"
-            >
-              Billing
-            </Link>
-            <Link
-              href="/dashboard/chat"
-              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-white/70 transition hover:bg-white/10 hover:text-white"
-            >
-              Ask AI
-            </Link>
-            <NotificationBell />
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-6xl space-y-8 px-6 py-10">
-        <SubscriptionBanner />
-        <DailyQueue />
-        {queue.error && (
-          <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-            {queue.error}
-          </p>
-        )}
-        {role === "director" && <DirectorView queue={queue} />}
-        {role === "manager" && <ManagerView queue={queue} />}
-        {role === "employee" && <EmployeeView queue={queue} />}
-      </main>
+    <div className="space-y-8">
+      {summary && <SubscriptionBanner status={summary.subscriptionStatus} />}
+      <DailyQueue />
+      {queue.error && (
+        <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          {queue.error}
+        </p>
+      )}
+      {role === "director" && <DirectorView queue={queue} summary={summary} />}
+      {role === "manager" && <ManagerView queue={queue} />}
+      {role === "employee" && <EmployeeView queue={queue} />}
     </div>
   );
 }
 
-export default function DashboardPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-navy" />}>
-      <DashboardContent />
-    </Suspense>
-  );
-}
-
-function SubscriptionBanner() {
-  const [status, setStatus] = useState<string | null>(null);
-
-  const load = useCallback(async (signal?: AbortSignal) => {
-    try {
-      const res = await fetch("/api/dashboard/summary", { signal });
-      const json = await res.json();
-      if (signal?.aborted) return;
-      if (res.ok) setStatus(json.subscriptionStatus);
-    } catch {
-      // Silent — a missing banner is a lot less important than the rest of the dashboard working.
-    }
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    // Fetch-on-mount with an abort-controlled cleanup — setState only runs
-    // after the awaited fetch resolves, never synchronously.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load(controller.signal);
-    return () => controller.abort();
-  }, [load]);
-
-  if (!status || ["active", "trialing"].includes(status)) return null;
+function SubscriptionBanner({ status }: { status: string }) {
+  if (["active", "trialing"].includes(status)) return null;
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/30 bg-gold/5 px-5 py-4">
@@ -212,37 +114,10 @@ function SubscriptionBanner() {
   );
 }
 
-function RiskScoreCard() {
-  const [summary, setSummary] = useState<{ score: number; totalRecovered: number; openItems: number } | null>(
-    null
-  );
-  const [error, setError] = useState<string | null>(null);
-
-  const loadSummary = useCallback(async (signal?: AbortSignal) => {
-    try {
-      const res = await fetch("/api/dashboard/summary", { signal });
-      const json = await res.json();
-      if (signal?.aborted) return;
-      if (!res.ok) throw new Error(json.error || "Could not load your risk score.");
-      setSummary(json);
-    } catch (err) {
-      if (!signal?.aborted) setError(err instanceof Error ? err.message : "Could not load your risk score.");
-    }
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    // Fetch-on-mount with an abort-controlled cleanup — setState only runs
-    // after the awaited fetch resolves, never synchronously.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadSummary(controller.signal);
-    return () => controller.abort();
-  }, [loadSummary]);
-
+function RiskScoreCard({ summary }: { summary: DashboardSummary | null }) {
   return (
     <div className="rounded-2xl border border-gold/30 bg-navy-light p-8 shadow-[var(--shadow-gold)]">
       <p className="text-sm text-white/50">Risk Exposure Score</p>
-      {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
       <div className="mt-2 flex items-baseline gap-3">
         <span className="font-display text-6xl font-semibold text-gold">
           {summary ? summary.score : "—"}
@@ -290,17 +165,19 @@ async function resolveDiscrepancy(id: string, reload: () => void) {
   reload();
 }
 
-function DirectorView({ queue }: { queue: QueueData }) {
+function DirectorView({ queue, summary }: { queue: QueueData; summary: DashboardSummary | null }) {
   const highSeverity = queue.obligations.filter((o) => o.severity === "high" && o.status === "open");
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-display text-2xl font-semibold text-white">Good morning, Director</h1>
+        <h1 className="font-display text-2xl font-semibold text-white">
+          Good morning{summary?.fullName ? `, ${summary.fullName.split(" ")[0]}` : ", Director"}
+        </h1>
         <p className="mt-1 text-white/50">Here&apos;s where things stand right now.</p>
       </div>
 
-      <RiskScoreCard />
+      <RiskScoreCard summary={summary} />
 
       <div>
         <h2 className="font-display text-lg font-semibold text-white">Escalated to you</h2>

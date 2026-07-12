@@ -34,16 +34,29 @@ export async function GET() {
   // must never take down the score/openItems calculation if that migration
   // hasn't run yet in a given environment.
   let subscriptionStatus = "inactive";
+  let tier = "micro";
+  let companyName = "";
   try {
     const { data: company } = await supabase
       .from("companies")
-      .select("subscription_status")
+      .select("subscription_status, tier, name")
       .eq("id", profile.company_id)
       .maybeSingle();
     if (company?.subscription_status) subscriptionStatus = company.subscription_status;
+    if (company?.tier) tier = company.tier;
+    if (company?.name) companyName = company.name;
   } catch {
     // Column doesn't exist yet in this environment — keep the safe default.
   }
 
-  return NextResponse.json({ score, totalRecovered, openItems, subscriptionStatus });
+  return NextResponse.json({
+    score,
+    totalRecovered,
+    openItems,
+    subscriptionStatus,
+    role: profile.role,
+    fullName: profile.full_name,
+    tier,
+    companyName,
+  });
 }
