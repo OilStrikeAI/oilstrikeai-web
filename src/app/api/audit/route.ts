@@ -4,7 +4,7 @@
 // the same schema a paying customer uses, just is_trial = true.
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { analyzeDocument, normalize, normalizeAmount } from "@/lib/documentAnalysis";
+import { analyzeDocument, normalize, normalizeAmount, normalizeDate, FREE_AUDIT_MODEL } from "@/lib/documentAnalysis";
 import { logError } from "@/lib/errorLog";
 
 export const maxDuration = 120;
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
     const pdfBase64 = Buffer.from(arrayBuffer).toString("base64");
 
     const analysisStartedAt = Date.now();
-    const findings = await analyzeDocument({ fileName: file.name, pdfBase64 });
+    const findings = await analyzeDocument({ fileName: file.name, pdfBase64, model: FREE_AUDIT_MODEL });
     const analysisDurationSeconds = (Date.now() - analysisStartedAt) / 1000;
 
     if (!findings.is_analyzable) {
@@ -144,8 +144,8 @@ export async function POST(request: Request) {
         document_id: document.id,
         contract_number: normalize(findings.contract_number),
         parties: findings.parties,
-        effective_date: normalize(findings.effective_date),
-        expiry_date: normalize(findings.expiry_date),
+        effective_date: normalizeDate(findings.effective_date),
+        expiry_date: normalizeDate(findings.expiry_date),
         extracted_at: new Date().toISOString(),
       })
       .select("id")
@@ -182,7 +182,7 @@ export async function POST(request: Request) {
           company_id: company.id,
           contract_id: contract.id,
           title: o.title,
-          due_date: normalize(o.due_date),
+          due_date: normalizeDate(o.due_date),
           recurrence: o.recurrence,
           severity: o.severity,
           assigned_team: o.assigned_team,

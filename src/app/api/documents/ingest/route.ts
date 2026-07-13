@@ -4,7 +4,7 @@
 // obligation lands as an open item in their queue, not just at month-end.
 import { NextResponse } from "next/server";
 import { getCurrentUserAndCompany } from "@/lib/serverAuth";
-import { analyzeDocument, normalize, normalizeAmount } from "@/lib/documentAnalysis";
+import { analyzeDocument, normalize, normalizeAmount, normalizeDate } from "@/lib/documentAnalysis";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logError } from "@/lib/errorLog";
 
@@ -74,8 +74,8 @@ export async function POST(request: Request) {
         document_id: document.id,
         contract_number: normalize(findings.contract_number),
         parties: findings.parties,
-        effective_date: normalize(findings.effective_date),
-        expiry_date: normalize(findings.expiry_date),
+        effective_date: normalizeDate(findings.effective_date),
+        expiry_date: normalizeDate(findings.expiry_date),
         extracted_at: new Date().toISOString(),
       })
       .select("id")
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
           company_id: profile.company_id,
           contract_id: contract.id,
           title: o.title,
-          due_date: normalize(o.due_date),
+          due_date: normalizeDate(o.due_date),
           recurrence: o.recurrence,
           severity: o.severity,
           assigned_team: o.assigned_team,

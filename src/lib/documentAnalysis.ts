@@ -16,7 +16,12 @@
 //   before writing to Postgres.
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
+// Dashboard customers (paying subscribers) get the strongest model. The free
+// public audit is a lead magnet, not a paid deliverable — a cheaper model
+// there keeps the cost of anonymous, unlimited-attempt abuse-prone traffic
+// low without touching the quality real subscribers pay for.
 export const ANALYSIS_MODEL = "claude-sonnet-5";
+export const FREE_AUDIT_MODEL = "claude-haiku-4-5-20251001";
 
 export type DiscrepancyCategory = "financial" | "legal" | "operational" | "fraud_risk";
 export type Tier = "red" | "yellow" | "white";
@@ -94,6 +99,12 @@ Never output or imply a confidence percentage. If a clause is genuinely ambiguou
 
 ## Trade pricing notation
 Oil trading and resale contracts sometimes write price as "$X/Y" (for example "$650/10"). This is standard trade notation meaning the base price is $X per unit, and $Y per unit is conceded to an intermediary or facilitator. It is NOT an ambiguous or garbled number and should never be flagged as such. When quantity is known, compute the implied total intermediary commission (Y × quantity) and mention it in the explanation if it is material.
+
+## Multiple fee/commission lines — hard rule, for stability across re-analysis
+When a document contains several distinct per-unit fees or commissions (e.g., separate facilitator, agent, and mandate fees, each its own "$X/Y" line), record them as ONE single discrepancy covering the whole suspicious payment structure — never split them into several separate discrepancy entries. Re-analyzing the identical document must always produce the identical grouping, not an arbitrary different split each time. List each individual fee line and its own computed total in the "explanation" text. Only set that discrepancy's "amount" field to a single combined dollar figure if the document itself states that combined total explicitly — if it does not, leave "amount" at 0 and let the per-line totals live in the explanation text instead of inventing your own grand total.
+
+## When NOT to attach a dollar amount — hard rule
+Many findings are not fundamentally about money and must get "amount": 0, even though other numbers appear elsewhere in the document. Examples that must NEVER get a computed or estimated "amount": a quantity or unit mismatch (e.g., "100,000 MT vs. 50,000 MT" — this is a logical inconsistency, not a cost), a date or validity-window problem, a blank or inconsistent identity field, a non-existent named arbitration body, spelling/naming inconsistencies, or a conflict between multiple stated prices where the document does not itself say which price governs or what quantity applies to the disputed difference. Do not multiply unrelated numbers together (e.g., a price difference × an unrelated quantity figure) to manufacture a dollar total — if the document does not directly state or directly support one specific number for a finding, leave "amount" at 0 and explain the issue in words instead. Only set a non-zero "amount" when the finding is itself fundamentally a cost, fee, or billing figure AND that number is directly stated or directly computable from figures the document explicitly gives for that exact finding.
 
 ## Showing real value, honestly — hard rule
 Every discrepancy must include a "stakes" sentence: one concise, honest sentence stating what is genuinely protected or at risk if this finding is acted on. This is NOT a place to invent urgency or exaggerate — it must be something you can defend from the document. For a financial finding, restate the dollar stake in plain words (e.g. "Correcting this recovers the $22,500 overbilled this cycle"). For a legal, operational, or fraud_risk finding with no dollar figure, describe the concrete real-world stake instead of a dollar amount (e.g. "Protects your right to elect non-consent within the required window" or "Prevents a payment from being routed to an unverified third party"). Never write a vague filler sentence — always name the specific thing at stake.
@@ -206,6 +217,7 @@ const RECORD_FINDINGS_TOOL = {
 export async function analyzeDocument(params: {
   fileName: string;
   pdfBase64: string;
+  model?: string;
 }): Promise<AuditFindings> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -222,9 +234,17 @@ export async function analyzeDocument(params: {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: ANALYSIS_MODEL,
+      model: params.model || ANALYSIS_MODEL,
       max_tokens: 8000,
-      system: SYSTEM_PROMPT,
+      // Zero temperature: this is an extraction task, not a creative one — the
+      // same document should produce the same dollar figures and findings
+      // every time it's analyzed, not drift between runs.
+      temperature: 0,
+      // The system prompt and tool schema are identical on every single call
+      // (only the document itself changes) — marking them cacheable means
+      // repeat calls only pay full price for the new document, not for
+      // re-sending the same few thousand tokens of instructions every time.
+      system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
       messages: [
         {
           role: "user",
@@ -244,7 +264,7 @@ export async function analyzeDocument(params: {
           ],
         },
       ],
-      tools: [RECORD_FINDINGS_TOOL],
+      tools: [{ ...RECORD_FINDINGS_TOOL, cache_control: { type: "ephemeral" } }],
       tool_choice: { type: "tool", name: "record_audit_findings" },
     }),
   });
@@ -268,6 +288,16 @@ export async function analyzeDocument(params: {
 
 export function normalize(value: string): string | null {
   return value.trim() === "" ? null : value;
+}
+
+// The model is instructed to always emit a full YYYY-MM-DD date or "", but
+// occasionally emits a partial date (e.g. "2025-10") when a document only
+// states a month/year — treated the same as "no fixed date" rather than
+// letting a malformed string crash the insert for the whole document.
+const FULL_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+export function normalizeDate(value: string): string | null {
+  if (!FULL_DATE_PATTERN.test(value.trim())) return null;
+  return Number.isNaN(new Date(value).getTime()) ? null : value;
 }
 
 export function normalizeAmount(value: number): number | null {
