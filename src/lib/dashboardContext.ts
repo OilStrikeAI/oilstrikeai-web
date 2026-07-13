@@ -8,6 +8,7 @@ export type DashboardSummary = {
   score: number;
   totalRecovered: number;
   openItems: number;
+  documentsAnalyzed: number;
   subscriptionStatus: string;
   role: Role;
   fullName: string | null;

@@ -10,6 +10,7 @@ import { DashboardSummaryContext, type DashboardSummary, type Role } from "@/lib
 
 const NAV_ITEMS: { href: string; label: string; roles: Role[]; icon: string }[] = [
   { href: "/dashboard", label: "Dashboard", roles: ["director", "manager", "employee"], icon: "grid" },
+  { href: "/dashboard/documents", label: "Documents", roles: ["director", "manager", "employee"], icon: "doc" },
   { href: "/dashboard/tasks", label: "Tasks", roles: ["director", "manager", "employee"], icon: "check" },
   { href: "/dashboard/team", label: "Team", roles: ["director", "manager"], icon: "people" },
   { href: "/dashboard/billing", label: "Billing", roles: ["director"], icon: "card" },
@@ -63,64 +64,6 @@ function NavIcon({ name }: { name: string }) {
   }
 }
 
-type RecentDoc = { id: string; file_name: string; created_at: string };
-
-function RecentDocuments() {
-  const pathname = usePathname();
-  const [docs, setDocs] = useState<RecentDoc[] | null>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    (async () => {
-      try {
-        const res = await fetch("/api/documents", { signal: controller.signal });
-        const json = await res.json();
-        if (controller.signal.aborted || !res.ok) return;
-        setDocs(json.documents.slice(0, 5));
-      } catch {
-        // Silent — the sidebar's recent-documents list is a convenience, not critical path.
-      }
-    })();
-    return () => controller.abort();
-  }, []);
-
-  if (docs === null || docs.length === 0) return null;
-
-  return (
-    <div className="mt-6">
-      <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-white/30">
-        Previous documents
-      </p>
-      <div className="space-y-0.5">
-        {docs.map((doc) => {
-          const href = `/dashboard/documents/${doc.id}`;
-          const active = pathname === href;
-          return (
-            <Link
-              key={doc.id}
-              href={href}
-              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs transition ${
-                active ? "bg-gold/10 text-gold" : "text-white/50 hover:bg-white/5 hover:text-white"
-              }`}
-            >
-              <span className="shrink-0">
-                <NavIcon name="doc" />
-              </span>
-              <span className="min-w-0 flex-1 truncate">{doc.file_name}</span>
-            </Link>
-          );
-        })}
-      </div>
-      <Link
-        href="/dashboard/documents"
-        className="mt-1 block px-3 py-1.5 text-xs font-medium text-white/40 transition hover:text-white"
-      >
-        View all →
-      </Link>
-    </div>
-  );
-}
-
 function SidebarContent({ role, fullName, companyName }: { role: Role; fullName: string | null; companyName: string }) {
   const pathname = usePathname();
   return (
@@ -150,8 +93,6 @@ function SidebarContent({ role, fullName, companyName }: { role: Role; fullName:
             );
           })}
         </div>
-
-        <RecentDocuments />
       </nav>
 
       <div className="border-t border-white/10 px-6 py-4">

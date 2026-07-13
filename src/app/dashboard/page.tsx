@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from "react";
 import { usePageTitle } from "@/lib/usePageTitle";
 import ActivityLog from "@/components/ActivityLog";
 import ExplainabilityDrawer, { type RealDiscrepancy } from "@/components/ExplainabilityDrawer";
-import DailyQueue from "@/components/DailyQueue";
 import { useDashboardSummary, type DashboardSummary } from "@/lib/dashboardContext";
 import { openChatWithQuestion } from "@/lib/chatWidgetEvents";
 
@@ -89,7 +88,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       {summary && <SubscriptionBanner status={summary.subscriptionStatus} />}
-      <DailyQueue />
+      <QueueSummaryCard queue={queue} />
       {queue.error && (
         <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
           {queue.error}
@@ -98,6 +97,63 @@ export default function DashboardPage() {
       {role === "director" && <DirectorView queue={queue} summary={summary} />}
       {role === "manager" && <ManagerView queue={queue} />}
       {role === "employee" && <EmployeeView queue={queue} />}
+    </div>
+  );
+}
+
+function QueueSummaryCard({ queue }: { queue: QueueData }) {
+  const redCount = queue.discrepancies.filter((d) => d.tier === "red").length;
+  const yellowCount = queue.discrepancies.filter((d) => d.tier === "yellow").length;
+  const whiteCount = queue.discrepancies.filter((d) => d.tier === "white").length;
+  const totalOpen = queue.discrepancies.length + queue.obligations.length;
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-navy-light p-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="font-display text-sm font-semibold uppercase tracking-wide text-gold">Daily Queue</p>
+          <p className="mt-1 text-sm text-white/50">
+            {queue.loading ? "Loading..." : `${totalOpen} open item(s) need your attention`}
+          </p>
+        </div>
+        <Link
+          href="/dashboard/documents"
+          className="whitespace-nowrap rounded-lg border border-white/20 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/10"
+        >
+          Full details →
+        </Link>
+      </div>
+
+      {!queue.loading && totalOpen > 0 && (
+        <div className="mt-5 flex flex-wrap gap-3">
+          {redCount > 0 && (
+            <span className="flex items-center gap-1.5 rounded-full bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-red-500" /> {redCount} urgent
+            </span>
+          )}
+          {yellowCount > 0 && (
+            <span className="flex items-center gap-1.5 rounded-full bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold">
+              <span className="h-1.5 w-1.5 rounded-full bg-gold" /> {yellowCount} needs review
+            </span>
+          )}
+          {whiteCount > 0 && (
+            <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/60">
+              <span className="h-1.5 w-1.5 rounded-full bg-white/40" /> {whiteCount} minor
+            </span>
+          )}
+          {queue.obligations.length > 0 && (
+            <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/60">
+              {queue.obligations.length} deadline{queue.obligations.length === 1 ? "" : "s"}
+            </span>
+          )}
+        </div>
+      )}
+
+      {!queue.loading && totalOpen === 0 && (
+        <p className="mt-4 text-sm text-white/40">
+          Nothing open right now. Add a document from the Documents page and it shows up here immediately.
+        </p>
+      )}
     </div>
   );
 }
@@ -121,6 +177,19 @@ function SubscriptionBanner({ status }: { status: string }) {
 }
 
 function RiskScoreCard({ summary }: { summary: DashboardSummary | null }) {
+  if (summary && summary.documentsAnalyzed === 0) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-navy-light p-8">
+        <p className="text-sm text-white/50">Risk Exposure Score</p>
+        <p className="mt-3 font-display text-xl font-semibold text-white">No documents analyzed yet</p>
+        <p className="mt-2 text-sm text-white/50">
+          Your risk score is computed from your real findings and deadlines — add your first document from the
+          Documents page and it&apos;ll appear here.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-2xl border border-gold/30 bg-navy-light p-8 shadow-[var(--shadow-gold)]">
       <p className="text-sm text-white/50">Risk Exposure Score</p>

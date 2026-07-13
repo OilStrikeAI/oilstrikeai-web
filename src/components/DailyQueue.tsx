@@ -105,7 +105,7 @@ function TierGroup({ label, dot, defaultOpen, items }: { label: string; dot: str
   );
 }
 
-export default function DailyQueue() {
+export default function DailyQueue({ onUploaded }: { onUploaded?: () => void } = {}) {
   const [discrepancies, setDiscrepancies] = useState<Discrepancy[] | null>(null);
   const [obligations, setObligations] = useState<Obligation[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -152,6 +152,7 @@ export default function DailyQueue() {
         `Added ${json.newDiscrepancyCount} finding(s) and ${json.newObligationCount} deadline(s) to your queue.`
       );
       await loadQueue();
+      onUploaded?.();
     } catch (err) {
       setUploadMessage(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {

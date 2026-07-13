@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { OPEN_CHAT_EVENT } from "@/lib/chatWidgetEvents";
+import { useDashboardSummary } from "@/lib/dashboardContext";
 
 type Message = { id?: string; role: "user" | "assistant"; content: string };
 
@@ -13,6 +14,8 @@ const SUGGESTIONS = [
 ];
 
 export default function ChatWidget() {
+  const { summary } = useDashboardSummary();
+  const firstName = summary?.fullName?.split(" ")[0];
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<"unloaded" | "locked" | "ready">("unloaded");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -164,9 +167,11 @@ export default function ChatWidget() {
               <>
                 {messages.length === 0 && (
                   <div className="space-y-3">
-                    <p className="text-sm text-white/40">
-                      Ask me anything about your contracts, findings, or deadlines.
-                    </p>
+                    <div className="flex justify-start">
+                      <div className="max-w-[90%] rounded-xl rounded-tl-sm border border-white/10 bg-navy px-3.5 py-2.5 text-sm text-white/90">
+                        {`Hey${firstName ? `, ${firstName}` : ""} — I'm your OilStrikeAI Assistant. Ask me anything about your contracts, findings, or deadlines, and I'll help you resolve it.`}
+                      </div>
+                    </div>
                     <div className="flex flex-col gap-2">
                       {SUGGESTIONS.map((s) => (
                         <button

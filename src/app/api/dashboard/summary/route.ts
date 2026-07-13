@@ -15,11 +15,12 @@ export async function GET() {
   }
   const { supabase, profile } = session;
 
-  const [{ data: openDiscrepancies }, { data: resolvedDiscrepancies }, { data: openObligations }] =
+  const [{ data: openDiscrepancies }, { data: resolvedDiscrepancies }, { data: openObligations }, { count: documentsAnalyzed }] =
     await Promise.all([
       supabase.from("discrepancies").select("tier").eq("status", "open"),
       supabase.from("discrepancies").select("amount").eq("status", "resolved"),
       supabase.from("obligations").select("severity").eq("status", "open"),
+      supabase.from("documents").select("id", { count: "exact", head: true }),
     ]);
 
   const penalty =
@@ -53,6 +54,7 @@ export async function GET() {
     score,
     totalRecovered,
     openItems,
+    documentsAnalyzed: documentsAnalyzed ?? 0,
     subscriptionStatus,
     role: profile.role,
     fullName: profile.full_name,
