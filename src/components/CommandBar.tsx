@@ -2,7 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { discrepancies, obligations } from "@/lib/mockData";
+
+type Discrepancy = { id: string; title: string; category: string; amount: number | null };
+type Obligation = { id: string; title: string; due_date: string | null };
 
 type Item = {
   id: string;
@@ -15,6 +17,9 @@ export default function CommandBar() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [discrepancies, setDiscrepancies] = useState<Discrepancy[]>([]);
+  const [obligations, setObligations] = useState<Obligation[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -28,26 +33,49 @@ export default function CommandBar() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  useEffect(() => {
+    if (!open || loaded) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/queue");
+        const json = await res.json();
+        if (cancelled || !res.ok) return;
+        setDiscrepancies(json.discrepancies ?? []);
+        setObligations(json.obligations ?? []);
+      } catch {
+        // Silent — search just comes up empty if this fails.
+      } finally {
+        if (!cancelled) setLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, loaded]);
+
   const items: Item[] = useMemo(() => {
     const discrepancyItems: Item[] = discrepancies.map((d) => ({
       id: d.id,
-      label: `${d.partner} — $${d.amount.toLocaleString("en-US")}`,
-      hint: d.clause,
-      onSelect: () => router.push("/dashboard?role=manager"),
+      label: d.title,
+      hint: d.amount ? `$${d.amount.toLocaleString("en-US")}` : d.category,
+      onSelect: () => router.push("/dashboard"),
     }));
     const obligationItems: Item[] = obligations.map((o) => ({
       id: o.id,
       label: o.title,
-      hint: `${o.clause} · due in ${o.dueInDays} days`,
-      onSelect: () => router.push("/dashboard?role=director"),
+      hint: o.due_date ? `Due ${new Date(o.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "No fixed date",
+      onSelect: () => router.push("/dashboard"),
     }));
     const navItems: Item[] = [
-      { id: "nav-director", label: "Go to Director view", hint: "Dashboard", onSelect: () => router.push("/dashboard?role=director") },
-      { id: "nav-manager", label: "Go to Manager view", hint: "Dashboard", onSelect: () => router.push("/dashboard?role=manager") },
-      { id: "nav-employee", label: "Go to Employee view", hint: "Dashboard", onSelect: () => router.push("/dashboard?role=employee") },
+      { id: "nav-dashboard", label: "Go to Dashboard", hint: "Nav", onSelect: () => router.push("/dashboard") },
+      { id: "nav-tasks", label: "Go to Tasks", hint: "Nav", onSelect: () => router.push("/dashboard/tasks") },
+      { id: "nav-team", label: "Go to Team", hint: "Nav", onSelect: () => router.push("/dashboard/team") },
+      { id: "nav-documents", label: "Go to Previous Documents", hint: "Nav", onSelect: () => router.push("/dashboard/documents") },
+      { id: "nav-billing", label: "Go to Billing", hint: "Nav", onSelect: () => router.push("/dashboard/billing") },
     ];
     return [...navItems, ...discrepancyItems, ...obligationItems];
-  }, [router]);
+  }, [router, discrepancies, obligations]);
 
   const filtered = items.filter(
     (i) =>
@@ -94,8 +122,8 @@ export default function CommandBar() {
                 }}
                 className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm text-white/80 transition hover:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-none"
               >
-                <span>{item.label}</span>
-                <span className="text-xs text-white/40">{item.hint}</span>
+                <span className="truncate">{item.label}</span>
+                <span className="ml-3 shrink-0 text-xs text-white/40">{item.hint}</span>
               </button>
             </li>
           ))}

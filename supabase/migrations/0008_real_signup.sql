@@ -29,14 +29,17 @@ declare
   upgrade_company uuid := nullif(new.raw_user_meta_data->>'existing_company_id', '')::uuid;
 begin
   if invited_company is not null then
-    insert into users (id, company_id, role, full_name, email)
+    insert into users (id, company_id, role, full_name, email, position, phone)
     values (
       new.id,
       invited_company,
       invited_role,
       nullif(new.raw_user_meta_data->>'full_name', ''),
-      new.email
+      new.email,
+      nullif(new.raw_user_meta_data->>'position', ''),
+      nullif(new.raw_user_meta_data->>'phone', '')
     );
+    delete from pending_invites where company_id = invited_company and email = new.email;
     return new;
   end if;
 

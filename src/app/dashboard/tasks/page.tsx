@@ -15,7 +15,14 @@ type Task = {
   created_at: string;
 };
 
-type TaskUpdate = { id: string; task_id: string; user_id: string; note: string; created_at: string };
+type TaskUpdate = {
+  id: string;
+  task_id: string;
+  user_id: string;
+  note: string;
+  created_at: string;
+  attachment_name: string | null;
+};
 type Member = { id: string; full_name: string | null; email: string; role: string };
 
 const STATUS_LABELS: Record<string, string> = { open: "Open", in_progress: "In progress", done: "Done" };
@@ -227,27 +234,44 @@ function TaskCard({
 }) {
   const [note, setNote] = useState("");
   const [status, setStatus] = useState(task.status);
+  const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   async function handleSubmit() {
     if (!note.trim()) return;
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`/api/tasks/${task.id}/updates`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ note, status }),
-      });
+      const formData = new FormData();
+      formData.append("note", note);
+      formData.append("status", status);
+      if (file) formData.append("file", file);
+      const res = await fetch(`/api/tasks/${task.id}/updates`, { method: "POST", body: formData });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Could not save your update.");
       setNote("");
+      setFile(null);
       onUpdated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save your update.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDownload(updateId: string) {
+    setDownloadingId(updateId);
+    try {
+      const res = await fetch(`/api/tasks/attachments/${updateId}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Could not open this attachment.");
+      window.location.assign(json.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not open this attachment.");
+    } finally {
+      setDownloadingId(null);
     }
   }
 
@@ -270,12 +294,22 @@ function TaskCard({
       {updates.length > 0 && (
         <div className="mt-4 space-y-2 border-t border-white/10 pt-4">
           {updates.map((u) => (
-            <p key={u.id} className="text-sm text-white/60">
+            <div key={u.id} className="text-sm text-white/60">
               <span className="text-white/30">
                 {new Date(u.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}:
               </span>{" "}
               {u.note}
-            </p>
+              {u.attachment_name && (
+                <button
+                  type="button"
+                  onClick={() => handleDownload(u.id)}
+                  disabled={downloadingId === u.id}
+                  className="ml-2 rounded-md border border-gold/30 bg-gold/10 px-2 py-0.5 text-xs font-semibold text-gold transition hover:bg-gold/20 disabled:opacity-50"
+                >
+                  {downloadingId === u.id ? "Opening..." : u.attachment_name}
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}
@@ -290,7 +324,7 @@ function TaskCard({
             rows={2}
             className="w-full rounded-lg border border-white/15 bg-navy px-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-gold focus:outline-none"
           />
-          <div className="mt-2 flex items-center gap-3">
+          <div className="mt-2 flex flex-wrap items-center gap-3">
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as Task["status"])}
@@ -300,6 +334,14 @@ function TaskCard({
               <option value="in_progress">In progress</option>
               <option value="done">Done</option>
             </select>
+            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-xs text-white/60 transition hover:border-white/30">
+              <input
+                type="file"
+                className="hidden"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              />
+              {file ? file.name : "+ Attach work"}
+            </label>
             <button
               type="button"
               onClick={handleSubmit}

@@ -24,10 +24,15 @@ export async function POST(request: Request) {
     const body = await request.json();
     const email = (body.email as string | undefined)?.trim();
     const fullName = (body.fullName as string | undefined)?.trim() || "";
+    const position = (body.position as string | undefined)?.trim() || "";
+    const phone = (body.phone as string | undefined)?.trim() || "";
     const role = (body.role as string | undefined) === "manager" ? "manager" : "employee";
 
     if (!email) {
       return NextResponse.json({ error: "An email address is required." }, { status: 400 });
+    }
+    if (!fullName) {
+      return NextResponse.json({ error: "A full name is required." }, { status: 400 });
     }
 
     const { data: company } = await supabase
@@ -56,12 +61,24 @@ export async function POST(request: Request) {
         invited_company_id: profile.company_id,
         invited_role: role,
         full_name: fullName,
+        position,
+        phone,
       },
     });
 
     if (inviteError) {
       return NextResponse.json({ error: inviteError.message }, { status: 500 });
     }
+
+    await supabase.from("pending_invites").insert({
+      company_id: profile.company_id,
+      invited_by: profile.id,
+      full_name: fullName,
+      position: position || null,
+      email,
+      phone: phone || null,
+      role,
+    });
 
     await admin.from("activity_log").insert({
       company_id: profile.company_id,

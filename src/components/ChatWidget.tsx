@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { OPEN_CHAT_EVENT } from "@/lib/chatWidgetEvents";
 
 type Message = { id?: string; role: "user" | "assistant"; content: string };
 
@@ -18,7 +19,18 @@ export default function ChatWidget() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleOpenChat(e: Event) {
+      const detail = (e as CustomEvent<{ question: string }>).detail;
+      setOpen(true);
+      if (detail?.question) setPendingQuestion(detail.question);
+    }
+    window.addEventListener(OPEN_CHAT_EVENT, handleOpenChat);
+    return () => window.removeEventListener(OPEN_CHAT_EVENT, handleOpenChat);
+  }, []);
 
   useEffect(() => {
     if (!open || status !== "unloaded") return;
@@ -76,6 +88,18 @@ export default function ChatWidget() {
     }
   }
 
+  useEffect(() => {
+    if (status !== "ready" || !pendingQuestion) return;
+    const question = pendingQuestion;
+    // Clearing the pending question and firing the send both happen here,
+    // synchronously, in response to the widget finishing its load — this is
+    // the intended one-shot "auto-ask" behavior, not an accidental loop.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPendingQuestion(null);
+    handleSend(question);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, pendingQuestion]);
+
   return (
     <>
       {open && (
@@ -83,8 +107,15 @@ export default function ChatWidget() {
           {/* Header */}
           <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-navy px-5 py-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gold font-display text-sm font-bold text-navy">
-                AI
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gold text-navy">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="3.4" r="1.3" fill="currentColor" />
+                  <path d="M12 4.7V7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  <rect x="5" y="7" width="14" height="12" rx="3" stroke="currentColor" strokeWidth="1.6" />
+                  <circle cx="9.5" cy="12.6" r="1.3" fill="currentColor" />
+                  <circle cx="14.5" cy="12.6" r="1.3" fill="currentColor" />
+                  <path d="M9.2 16h5.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
               </div>
               <div>
                 <p className="text-sm font-semibold text-white">OilStrikeAI Assistant</p>
@@ -225,11 +256,14 @@ export default function ChatWidget() {
             <path d="M2 2L14 14M14 2L2 14" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
           </svg>
         ) : (
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M4 5.5C4 4.67 4.67 4 5.5 4h13c.83 0 1.5.67 1.5 1.5v9c0 .83-.67 1.5-1.5 1.5H9l-4 3.5v-3.5H5.5c-.83 0-1.5-.67-1.5-1.5v-9Z"
-              fill="currentColor"
-            />
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="3.4" r="1.3" fill="currentColor" />
+            <path d="M12 4.7V7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <rect x="5" y="7" width="14" height="12" rx="3" stroke="currentColor" strokeWidth="1.6" />
+            <circle cx="9.5" cy="12.6" r="1.3" fill="currentColor" />
+            <circle cx="14.5" cy="12.6" r="1.3" fill="currentColor" />
+            <path d="M9.2 16h5.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            <path d="M3 11.5v3M21 11.5v3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
         )}
       </button>

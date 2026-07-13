@@ -3,13 +3,19 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { usePageTitle } from "@/lib/usePageTitle";
-import ForecastPanel from "@/components/ForecastPanel";
-import ConsequenceChain from "@/components/ConsequenceChain";
-import ConflictMap from "@/components/ConflictMap";
 import ActivityLog from "@/components/ActivityLog";
 import ExplainabilityDrawer, { type RealDiscrepancy } from "@/components/ExplainabilityDrawer";
 import DailyQueue from "@/components/DailyQueue";
 import { useDashboardSummary, type DashboardSummary } from "@/lib/dashboardContext";
+import { openChatWithQuestion } from "@/lib/chatWidgetEvents";
+
+function askAiAbout(d: RealDiscrepancy) {
+  openChatWithQuestion(
+    `Help me resolve this finding: "${d.title}". ${d.explanation} ${
+      d.suggested_next_step ? `The suggested next step is: ${d.suggested_next_step}` : ""
+    } What should I do, step by step?`
+  );
+}
 
 type RealObligation = {
   id: string;
@@ -128,14 +134,25 @@ function RiskScoreCard({ summary }: { summary: DashboardSummary | null }) {
         Computed from your real open items — 100 minus a fixed penalty per open finding/obligation, by severity.
       </p>
       <div className="mt-6 grid grid-cols-2 gap-4 border-t border-white/10 pt-6">
-        <div>
-          <p className="font-display text-2xl font-semibold text-white">
+        <div className="rounded-xl bg-navy p-4">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-money-green/15 text-money-green">
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+              <path d="M2.5 7.5l3 3 6-6.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+          <p className="font-display mt-3 text-2xl font-semibold text-white">
             ${(summary?.totalRecovered ?? 0).toLocaleString("en-US")}
           </p>
           <p className="text-xs text-white/40">Recovered (resolved findings)</p>
         </div>
-        <div>
-          <p className="font-display text-2xl font-semibold text-white">{summary?.openItems ?? "—"}</p>
+        <div className="rounded-xl bg-navy p-4">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gold/15 text-gold">
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+              <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.4" />
+              <path d="M7 4v3.2l2 1.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+          <p className="font-display mt-3 text-2xl font-semibold text-white">{summary?.openItems ?? "—"}</p>
           <p className="text-xs text-white/40">Open items need attention</p>
         </div>
       </div>
@@ -202,8 +219,6 @@ function DirectorView({ queue, summary }: { queue: QueueData; summary: Dashboard
           })}
         </div>
       </div>
-
-      <ForecastPanel />
     </div>
   );
 }
@@ -217,9 +232,6 @@ function ManagerView({ queue }: { queue: QueueData }) {
         <h1 className="font-display text-2xl font-semibold text-white">Team Queue</h1>
         <p className="mt-1 text-white/50">Everything your team is working on, across all JVs.</p>
       </div>
-
-      <ConflictMap />
-      <ConsequenceChain />
 
       <div>
         <h2 className="font-display text-lg font-semibold text-white">Open findings</h2>
@@ -242,6 +254,20 @@ function ManagerView({ queue }: { queue: QueueData }) {
                   </p>
                 ) : null}
               </div>
+              {d.suggested_next_step && (
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-navy p-4">
+                  <p className="min-w-0 flex-1 text-sm text-white/60">
+                    <span className="font-semibold text-white">Suggestion: </span>
+                    {d.suggested_next_step}
+                  </p>
+                  <button
+                    onClick={() => askAiAbout(d)}
+                    className="shrink-0 rounded-md border border-gold/30 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/20"
+                  >
+                    Use AI to solve this
+                  </button>
+                </div>
+              )}
               <div className="mt-4 flex flex-wrap gap-3">
                 <button
                   onClick={() => resolveDiscrepancy(d.id, queue.reload)}
@@ -282,9 +308,17 @@ function EmployeeView({ queue }: { queue: QueueData }) {
             </p>
             <p className="mt-2 text-sm text-white/60">{d.explanation}</p>
             {d.suggested_next_step && (
-              <div className="mt-4 rounded-lg bg-navy p-4 text-sm text-white/60">
-                <span className="font-semibold text-white">Suggested next step: </span>
-                {d.suggested_next_step}
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-navy p-4">
+                <p className="min-w-0 flex-1 text-sm text-white/60">
+                  <span className="font-semibold text-white">Suggestion: </span>
+                  {d.suggested_next_step}
+                </p>
+                <button
+                  onClick={() => askAiAbout(d)}
+                  className="shrink-0 rounded-md border border-gold/30 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/20"
+                >
+                  Use AI to solve this
+                </button>
               </div>
             )}
             <div className="mt-4 flex flex-wrap gap-3">
