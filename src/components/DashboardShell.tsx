@@ -70,7 +70,7 @@ function SidebarContent({ role, fullName, companyName }: { role: Role; fullName:
     <>
       <Link href="/" className="flex items-center gap-2 border-b border-white/10 px-6 py-5">
         <span className="font-display text-lg font-semibold text-white">
-          OilStrike<span className="italic text-gold">AI</span>
+          OilStrike<span className="italic text-gold" style={{ textShadow: "0 0 16px rgba(212,160,23,0.5)" }}>AI</span>
         </span>
       </Link>
 
@@ -83,10 +83,16 @@ function SidebarContent({ role, fullName, companyName }: { role: Role; fullName:
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                className={`relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition ${
                   active ? "bg-gold/10 text-gold" : "text-white/60 hover:bg-white/5 hover:text-white"
                 }`}
               >
+                {active && (
+                  <span
+                    className="absolute -left-3 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-gold"
+                    style={{ boxShadow: "0 0 10px rgba(212,160,23,0.8)" }}
+                  />
+                )}
                 <NavIcon name={item.icon} />
                 {item.label}
               </Link>
@@ -107,7 +113,10 @@ function SidebarContent({ role, fullName, companyName }: { role: Role; fullName:
 
 function Sidebar(props: { role: Role; fullName: string | null; companyName: string }) {
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-white/10 bg-navy-light md:flex">
+    <aside
+      className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-white/10 md:flex"
+      style={{ background: "linear-gradient(180deg, var(--navy-light), var(--navy))" }}
+    >
       <SidebarContent {...props} />
     </aside>
   );
@@ -230,7 +239,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           />
         )}
 
-        <header className="sticky top-0 z-30 border-b border-white/10 bg-navy/95 backdrop-blur">
+        <header
+          className="sticky top-0 z-30 border-b border-white/10 bg-navy/95 backdrop-blur"
+          style={{ boxShadow: "0 1px 0 rgba(212,160,23,0.15)" }}
+        >
           <div className="flex items-center justify-between gap-4 px-6 py-4">
             <button
               type="button"
@@ -252,7 +264,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           </div>
         </header>
 
-        <main className="px-6 py-10">
+        <main className="bg-hud-grid min-h-[calc(100vh-73px)] px-6 py-10">
           {error && (
             <p className="mb-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
               {error}

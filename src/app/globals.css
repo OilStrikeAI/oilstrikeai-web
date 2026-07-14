@@ -43,3 +43,46 @@ body {
   opacity: 0.05;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
+
+/* Futuristic HUD-style texture: a faint fixed grid, like graph paper under
+   glass. Applied to large dashboard/section backgrounds, never to text
+   containers, so it never competes with content. */
+.bg-hud-grid {
+  background-image:
+    linear-gradient(rgba(212, 160, 23, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(212, 160, 23, 0.06) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* A soft radial glow anchored to one corner, for panels that want depth
+   without a full gradient background. */
+.glow-corner {
+  position: relative;
+  isolation: isolate;
+}
+.glow-corner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse 120% 80% at 100% 0%, rgba(212, 160, 23, 0.12), transparent 60%);
+}
+
+/* Panel with a gradient edge instead of a flat single-color border —
+   the signature "glowing frame" look used on featured cards. */
+.glow-frame {
+  position: relative;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--navy-light), var(--navy-light)) padding-box,
+    linear-gradient(135deg, rgba(212, 160, 23, 0.6), rgba(212, 160, 23, 0.05) 40%, rgba(212, 160, 23, 0.35)) border-box;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(212, 160, 23, 0.5); }
+  50% { opacity: 0.7; box-shadow: 0 0 0 4px rgba(212, 160, 23, 0); }
+}
+.pulse-dot {
+  animation: pulse-glow 2s ease-in-out infinite;
+}

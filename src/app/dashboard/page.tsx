@@ -176,10 +176,48 @@ function SubscriptionBanner({ status }: { status: string }) {
   );
 }
 
+function ScoreRing({ score }: { score: number }) {
+  const size = 148;
+  const strokeWidth = 10;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - score / 100);
+
+  return (
+    <div className="relative h-[148px] w-[148px] shrink-0">
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={radius} stroke="rgba(255,255,255,0.08)" strokeWidth={strokeWidth} fill="none" />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="url(#scoreRingGradient)"
+          strokeWidth={strokeWidth}
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          style={{ filter: "drop-shadow(0 0 10px rgba(212,160,23,0.65))", transition: "stroke-dashoffset 1s ease" }}
+        />
+        <defs>
+          <linearGradient id="scoreRingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#f0c14b" />
+            <stop offset="100%" stopColor="#d4a017" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="font-display text-4xl font-semibold text-gold">{score}</span>
+        <span className="text-xs text-white/40">/100</span>
+      </div>
+    </div>
+  );
+}
+
 function RiskScoreCard({ summary }: { summary: DashboardSummary | null }) {
   if (summary && summary.documentsAnalyzed === 0) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-navy-light p-8">
+      <div className="glow-frame glow-corner rounded-2xl p-8">
         <p className="text-sm text-white/50">Risk Exposure Score</p>
         <p className="mt-3 font-display text-xl font-semibold text-white">No documents analyzed yet</p>
         <p className="mt-2 text-sm text-white/50">
@@ -191,17 +229,19 @@ function RiskScoreCard({ summary }: { summary: DashboardSummary | null }) {
   }
 
   return (
-    <div className="rounded-2xl border border-gold/30 bg-navy-light p-8 shadow-[var(--shadow-gold)]">
-      <p className="text-sm text-white/50">Risk Exposure Score</p>
-      <div className="mt-2 flex items-baseline gap-3">
-        <span className="font-display text-6xl font-semibold text-gold">
-          {summary ? summary.score : "—"}
-        </span>
-        <span className="text-white/40">/100</span>
+    <div className="glow-frame glow-corner bg-hud-grid rounded-2xl p-8">
+      <div className="flex flex-wrap items-center gap-8">
+        <ScoreRing score={summary?.score ?? 0} />
+        <div className="min-w-[200px] flex-1">
+          <p className="flex items-center gap-2 text-sm text-white/50">
+            <span className="h-1.5 w-1.5 rounded-full bg-gold pulse-dot" />
+            Risk Exposure Score
+          </p>
+          <p className="mt-2 text-sm text-white/40">
+            Computed from your real open items — 100 minus a fixed penalty per open finding/obligation, by severity.
+          </p>
+        </div>
       </div>
-      <p className="mt-1 text-xs text-white/30">
-        Computed from your real open items — 100 minus a fixed penalty per open finding/obligation, by severity.
-      </p>
       <div className="mt-6 grid grid-cols-2 gap-4 border-t border-white/10 pt-6">
         <div className="rounded-xl bg-navy p-4">
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-money-green/15 text-money-green">

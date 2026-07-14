@@ -61,7 +61,7 @@ const roles = [
 
 function BrowserFrame({ children, title }: { children: React.ReactNode; title: string }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-navy-light shadow-[var(--shadow-float)]">
+    <div className="glow-frame overflow-hidden rounded-2xl shadow-[var(--shadow-float)]">
       <div className="flex items-center gap-2 border-b border-white/10 bg-white/[0.03] px-4 py-3">
         <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
         <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
@@ -83,12 +83,12 @@ export default function Home() {
       <Nav />
 
       {/* Hero */}
-      <section className="bg-grain relative overflow-hidden">
+      <section className="bg-grain bg-hud-grid relative overflow-hidden">
         <div
           className="pointer-events-none absolute inset-0"
           style={{
             background:
-              "radial-gradient(ellipse 60% 50% at 50% 0%, rgba(212,160,23,0.15), transparent), radial-gradient(ellipse 40% 40% at 90% 20%, rgba(212,160,23,0.08), transparent)",
+              "radial-gradient(ellipse 60% 50% at 50% 0%, rgba(212,160,23,0.18), transparent), radial-gradient(ellipse 40% 40% at 90% 20%, rgba(212,160,23,0.1), transparent)",
           }}
         />
         <div className="relative mx-auto max-w-6xl px-6 pt-24 pb-20 text-center">
@@ -100,7 +100,9 @@ export default function Home() {
           <h1 className="mx-auto mt-6 max-w-3xl font-display text-5xl font-semibold leading-[1.05] tracking-tight text-white md:text-6xl">
             Find the money hidden in your JV billing.
             <br />
-            <span className="italic text-gold">Never miss another contract deadline.</span>
+            <span className="italic text-gold" style={{ textShadow: "0 0 30px rgba(212,160,23,0.45)" }}>
+              Never miss another contract deadline.
+            </span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-white/60">
             OilStrikeAI reads your PSC or JOA once and automatically reconciles every
@@ -297,7 +299,7 @@ export default function Home() {
             {roles.map((r) => (
               <div
                 key={r.name}
-                className="rounded-2xl border border-white/10 bg-navy p-8 shadow-[var(--shadow-card)]"
+                className="glow-corner rounded-2xl border border-white/10 bg-navy p-8 shadow-[var(--shadow-card)] transition hover:border-gold/30"
               >
                 <p className="text-xs font-semibold uppercase tracking-wide text-gold">{r.name}</p>
                 <h3 className="mt-2 font-display text-xl font-semibold text-white">{r.tagline}</h3>
@@ -362,7 +364,10 @@ export default function Home() {
 
       {/* Guarantee */}
       <section className="mx-auto max-w-4xl px-6 py-10">
-        <div className="rounded-2xl border-2 border-gold bg-navy-light p-10 text-center">
+        <div
+          className="rounded-2xl border-2 border-gold bg-navy-light p-10 text-center"
+          style={{ boxShadow: "0 0 60px -12px rgba(212,160,23,0.35)" }}
+        >
           <h3 className="font-display text-2xl font-semibold text-white">The Guarantee</h3>
           <p className="mt-4 text-lg text-white/70">
             We&apos;ll find at least <span className="font-bold text-gold">$50,000</span> in
@@ -384,10 +389,10 @@ export default function Home() {
           {pricingTiers.map((tier) => (
             <div
               key={tier.name}
-              className={`rounded-2xl border p-8 transition hover:-translate-y-1 ${
+              className={`rounded-2xl p-8 transition hover:-translate-y-1 ${
                 tier.highlighted
-                  ? "border-gold bg-navy-light shadow-[var(--shadow-gold)]"
-                  : "border-white/10 hover:border-white/20"
+                  ? "glow-frame shadow-[var(--shadow-gold)]"
+                  : "border border-white/10 hover:border-white/20"
               }`}
             >
               <h3 className="font-semibold text-white">{tier.name}</h3>
