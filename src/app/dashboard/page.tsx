@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePageTitle } from "@/lib/usePageTitle";
 import ActivityLog from "@/components/ActivityLog";
 import ExplainabilityDrawer, { type RealDiscrepancy } from "@/components/ExplainabilityDrawer";
@@ -88,6 +88,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       {summary && <SubscriptionBanner status={summary.subscriptionStatus} />}
+      <AnalyzeDocumentCard onAnalyzed={queue.reload} />
       <QueueSummaryCard queue={queue} />
       {queue.error && (
         <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
@@ -97,6 +98,83 @@ export default function DashboardPage() {
       {role === "director" && <DirectorView queue={queue} summary={summary} />}
       {role === "manager" && <ManagerView queue={queue} />}
       {role === "employee" && <EmployeeView queue={queue} />}
+    </div>
+  );
+}
+
+function AnalyzeDocumentCard({ onAnalyzed }: { onAnalyzed: () => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [lastDocId, setLastDocId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFileSelected(file: File) {
+    setUploading(true);
+    setMessage(null);
+    setLastDocId(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/documents/ingest", { method: "POST", body: formData });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Something went wrong analyzing that document.");
+      setMessage(`Found ${json.newDiscrepancyCount} finding(s) and ${json.newObligationCount} deadline(s).`);
+      setLastDocId(json.documentId);
+      onAnalyzed();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="glow-frame glow-corner rounded-2xl p-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="font-display text-sm font-semibold uppercase tracking-wide text-gold">Start here</p>
+          <p className="mt-1 text-lg font-semibold text-white">Analyze a contract or JIB</p>
+          <p className="mt-1 text-sm text-white/50">
+            Everything else — your risk score, the daily queue, delegated tasks, the AI assistant — is built from
+            the documents you analyze here.
+          </p>
+        </div>
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleFileSelected(file);
+            }}
+          />
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => fileInputRef.current?.click()}
+            className="whitespace-nowrap rounded-lg bg-gold px-5 py-3 text-sm font-semibold text-navy shadow-[var(--shadow-gold)] transition hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {uploading ? "Analyzing..." : "+ Upload a document"}
+          </button>
+        </div>
+      </div>
+
+      {message && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-navy px-4 py-3">
+          <p className="text-sm text-white/70">{message}</p>
+          {lastDocId && (
+            <Link
+              href={`/dashboard/documents/${lastDocId}`}
+              className="whitespace-nowrap rounded-md border border-gold/30 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold transition hover:bg-gold/20"
+            >
+              View analysis →
+            </Link>
+          )}
+        </div>
+      )}
     </div>
   );
 }
