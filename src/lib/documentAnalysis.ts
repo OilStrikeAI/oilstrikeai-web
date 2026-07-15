@@ -226,6 +226,15 @@ export async function analyzeDocument(params: {
     );
   }
 
+  const modelToUse = params.model || ANALYSIS_MODEL;
+  // Zero temperature: this is an extraction task, not a creative one — the
+  // same document should produce the same dollar figures and findings every
+  // time it's analyzed, not drift between runs. ANALYSIS_MODEL (Sonnet, used
+  // for real paying-customer analysis) rejects this parameter outright
+  // ("temperature is deprecated for this model") — only send it for models
+  // that actually accept it.
+  const supportsTemperature = modelToUse !== ANALYSIS_MODEL;
+
   const response = await fetch(ANTHROPIC_API_URL, {
     method: "POST",
     headers: {
@@ -234,12 +243,9 @@ export async function analyzeDocument(params: {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: params.model || ANALYSIS_MODEL,
+      model: modelToUse,
       max_tokens: 8000,
-      // Zero temperature: this is an extraction task, not a creative one — the
-      // same document should produce the same dollar figures and findings
-      // every time it's analyzed, not drift between runs.
-      temperature: 0,
+      ...(supportsTemperature ? { temperature: 0 } : {}),
       // The system prompt and tool schema are identical on every single call
       // (only the document itself changes) — marking them cacheable means
       // repeat calls only pay full price for the new document, not for
