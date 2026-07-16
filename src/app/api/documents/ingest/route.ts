@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUserAndCompany } from "@/lib/serverAuth";
 import { analyzeDocument, normalize, normalizeAmount, normalizeDate } from "@/lib/documentAnalysis";
+import { detectAndSaveConflicts } from "@/lib/conflictDetection";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logError } from "@/lib/errorLog";
 
@@ -124,6 +125,30 @@ export async function POST(request: Request) {
       );
       if (error) throw new Error(`Failed to save obligations: ${error.message}`);
       newObligationCount = findings.obligations.length;
+    }
+
+    // Real cross-contract conflict detection (Tier 2's promised feature):
+    // save this contract's structured key terms, then compare them against
+    // every OTHER contract already on file for this company. A genuine
+    // difference in a comparable term (not an AI guess) becomes a new
+    // "conflict" discrepancy, citing both contracts and both pages.
+    if (findings.key_terms.length > 0) {
+      const { error: termsError } = await supabase.from("contract_terms").insert(
+        findings.key_terms.map((t) => ({
+          company_id: profile.company_id,
+          contract_id: contract.id,
+          term_type: t.term_type,
+          value_text: t.value_text,
+          value_number: t.term_type === "arbitration_seat" ? null : t.value_number,
+          page_reference: normalize(t.page_reference),
+        }))
+      );
+      if (termsError) {
+        console.error("[/api/documents/ingest] failed to save contract_terms:", termsError);
+      } else {
+        const newConflictCount = await detectAndSaveConflicts(supabase, profile.company_id, contract.id);
+        newDiscrepancyCount += newConflictCount;
+      }
     }
 
     await createAdminClient().from("activity_log").insert({

@@ -16,6 +16,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   legal: "Legal",
   operational: "Operational",
   fraud_risk: "Fraud Risk Indicator",
+  conflict: "Cross-Contract Conflict",
 };
 
 const CYCLES_PER_YEAR: Record<string, number> = { monthly: 12, quarterly: 4, annual: 1 };

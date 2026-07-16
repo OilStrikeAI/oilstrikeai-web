@@ -51,6 +51,15 @@ export type AuditObligation = {
   assigned_team: AssignedTeam;
 };
 
+export type KeyTermType = "overhead_rate_percent" | "non_consent_notice_days" | "payment_terms_days" | "arbitration_seat";
+
+export type AuditKeyTerm = {
+  term_type: KeyTermType;
+  value_text: string;
+  value_number: number;
+  page_reference: string;
+};
+
 export type AuditFindings = {
   is_analyzable: boolean;
   rejection_reason: string;
@@ -62,6 +71,7 @@ export type AuditFindings = {
   executive_summary: string;
   discrepancies: AuditDiscrepancy[];
   obligations: AuditObligation[];
+  key_terms: AuditKeyTerm[];
 };
 
 const SYSTEM_PROMPT = `You are the OilStrikeAI Document Analysis System. You read oil & gas contracts and billing statements (PSC, JOA, TSA, CPA, SPA, JIB, and related documents) for African oil & gas operators and their partners, and you surface the money, deadlines, and risks a busy person would miss.
@@ -116,6 +126,14 @@ Every discrepancy must include a "stakes" sentence: one concise, honest sentence
 
 ## Key dates & deadlines
 Extract every deadline, recurring duty, and time-bound obligation into "obligations" — not just discrepancies. Compute an absolute due_date (YYYY-MM-DD) whenever you can anchor it to a stated effective date or explicit calendar date in the document. If a duty is real but you cannot anchor it to a specific date, still include it with due_date as "" and explain the timing basis in the title.
+
+## Key terms — for cross-contract comparison, hard rule
+Separately from "discrepancies" (which flag problems WITHIN this one document), extract into "key_terms" any of the following four term types that this document actually states, so they can be compared against a company's OTHER contracts later:
+- "overhead_rate_percent": the overhead recovery rate cap, as a percentage (e.g., a clause capping overhead at 3.0% of direct costs). "value_number" = 3.0, "value_text" = "3.0% of direct costs".
+- "non_consent_notice_days": the notice period, in days, for a non-consent or non-participation election. "value_number" = 10, "value_text" = "10 days".
+- "payment_terms_days": the number of days allowed for payment after invoice or document presentation. "value_number" = 5, "value_text" = "5 Banking Days".
+- "arbitration_seat": the named seat/location/institution for arbitration or dispute resolution (a place or body, not a full clause). "value_number" = 0 (not applicable), "value_text" = the exact named seat/institution, e.g., "London, England" or "ICC Paris".
+Only extract a key term when the document explicitly and unambiguously states it — never guess, infer, or default a value. If a term type does not appear in the document, simply omit it from "key_terms" (do not invent an entry for it). If a document contains the same term type twice with different values (e.g., a rate stated in two different clauses), extract BOTH occurrences separately — do not average or pick one; a real internal inconsistency like this should already surface as its own "discrepancy" too. Always include the real "page_reference" for each key term, in the same format as discrepancy citations.
 
 ## Executive summary
 Write 2-4 sentences a busy operator could read in 15 seconds: the total dollar exposure found, the single most urgent item, and the overall picture. No hedging filler.
@@ -201,6 +219,23 @@ const RECORD_FINDINGS_TOOL = {
           required: ["title", "due_date", "recurrence", "severity", "assigned_team"],
         },
       },
+      key_terms: {
+        type: "array",
+        description: "Structured, comparable terms this document explicitly states, for cross-contract conflict detection. Omit any term type the document doesn't state — never invent one.",
+        items: {
+          type: "object",
+          properties: {
+            term_type: {
+              type: "string",
+              enum: ["overhead_rate_percent", "non_consent_notice_days", "payment_terms_days", "arbitration_seat"],
+            },
+            value_text: { type: "string" },
+            value_number: { type: "number", description: "0 for arbitration_seat (not numeric)" },
+            page_reference: { type: "string" },
+          },
+          required: ["term_type", "value_text", "value_number", "page_reference"],
+        },
+      },
     },
     required: [
       "is_analyzable",
@@ -213,6 +248,7 @@ const RECORD_FINDINGS_TOOL = {
       "executive_summary",
       "discrepancies",
       "obligations",
+      "key_terms",
     ],
   },
 };
