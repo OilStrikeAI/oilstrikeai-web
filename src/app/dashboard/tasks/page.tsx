@@ -13,6 +13,8 @@ type Task = {
   status: "open" | "in_progress" | "done";
   due_date: string | null;
   created_at: string;
+  completion_percent: number | null;
+  completion_rationale: string | null;
 };
 
 type TaskUpdate = {
@@ -290,6 +292,23 @@ function TaskCard({
         </span>
       </div>
       {task.description && <p className="mt-3 text-sm text-white/70">{task.description}</p>}
+
+      {task.completion_percent != null && (
+        <div className="mt-4">
+          <div className="flex items-center justify-between text-xs text-white/50">
+            <span>AI estimate: {task.completion_percent}% complete</span>
+          </div>
+          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-gold transition-all"
+              style={{ width: `${task.completion_percent}%` }}
+            />
+          </div>
+          {task.completion_rationale && (
+            <p className="mt-1.5 text-xs italic text-white/40">{task.completion_rationale}</p>
+          )}
+        </div>
+      )}
 
       {updates.length > 0 && (
         <div className="mt-4 space-y-2 border-t border-white/10 pt-4">

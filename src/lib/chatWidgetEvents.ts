@@ -4,6 +4,8 @@
 // mounted once at the dashboard layout level, far from where findings render.
 export const OPEN_CHAT_EVENT = "oilstrike-open-chat";
 
-export function openChatWithQuestion(question: string) {
-  window.dispatchEvent(new CustomEvent(OPEN_CHAT_EVENT, { detail: { question } }));
+export type ChatDiscrepancyContext = { discrepancyId: string; title: string; description?: string };
+
+export function openChatWithQuestion(question: string, context?: ChatDiscrepancyContext) {
+  window.dispatchEvent(new CustomEvent(OPEN_CHAT_EVENT, { detail: { question, context } }));
 }

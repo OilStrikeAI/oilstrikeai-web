@@ -7,6 +7,7 @@ import { getCurrentUserAndCompany } from "@/lib/serverAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email";
 import { logError } from "@/lib/errorLog";
+import { estimateTaskCompletion } from "@/lib/taskCompletion";
 
 const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
 
@@ -33,7 +34,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/tasks/[id]/
 
     const { data: task } = await supabase
       .from("tasks")
-      .select("id, title, assigned_to, assigned_by")
+      .select("id, title, description, assigned_to, assigned_by")
       .eq("id", taskId)
       .maybeSingle();
 
@@ -72,6 +73,19 @@ export async function POST(request: Request, ctx: RouteContext<"/api/tasks/[id]/
 
     if (status && ["open", "in_progress", "done"].includes(status)) {
       await supabase.from("tasks").update({ status }).eq("id", taskId);
+    }
+
+    const estimate = await estimateTaskCompletion({
+      taskTitle: task.title,
+      taskDescription: task.description,
+      note,
+      hadAttachment: Boolean(attachmentPath),
+    });
+    if (estimate) {
+      await supabase
+        .from("tasks")
+        .update({ completion_percent: estimate.percent, completion_rationale: estimate.rationale })
+        .eq("id", taskId);
     }
 
     const statusLabel = status === "done" ? "marked it done" : status === "in_progress" ? "marked it in progress" : "logged progress";

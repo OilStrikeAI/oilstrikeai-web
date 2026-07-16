@@ -81,11 +81,17 @@ ${obligationsBlock}
 `;
 }
 
-export async function askAssistant(params: {
+// Streams the reply token-by-token instead of waiting for the full answer —
+// the model's total response time doesn't change, but the user sees words
+// appear within ~1 second instead of staring at "Thinking..." for the whole
+// duration. Yields plain text deltas; the caller (the API route) is
+// responsible for forwarding them to the client and accumulating the full
+// answer to save once the stream ends.
+export async function* streamAssistant(params: {
   context: CompanyContext;
   history: ChatMessage[];
   question: string;
-}): Promise<string> {
+}): AsyncGenerator<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY is not configured.");
@@ -106,18 +112,39 @@ export async function askAssistant(params: {
         ...params.history.map((m) => ({ role: m.role, content: m.content })),
         { role: "user", content: params.question },
       ],
+      stream: true,
     }),
   });
 
-  if (!response.ok) {
+  if (!response.ok || !response.body) {
     const errorText = await response.text();
     throw new Error(`Anthropic API error ${response.status}: ${errorText}`);
   }
 
-  const data = await response.json();
-  const textBlock = (data.content as Array<Record<string, unknown>>)?.find((b) => b.type === "text");
-  if (!textBlock || typeof textBlock.text !== "string") {
-    throw new Error("The assistant did not return a text reply.");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const payload = line.slice("data: ".length).trim();
+      if (!payload) continue;
+      try {
+        const event = JSON.parse(payload);
+        if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
+          yield event.delta.text as string;
+        }
+      } catch {
+        // Ignore malformed SSE lines rather than failing the whole stream.
+      }
+    }
   }
-  return textBlock.text;
 }

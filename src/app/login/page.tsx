@@ -11,7 +11,6 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("director");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -30,11 +29,7 @@ export default function LoginPage() {
       return;
     }
 
-    // TEMPORARY: the dashboard still reads its role from this query param and
-    // shows mock data (see Day 2 of the build plan). Once the dashboard reads
-    // the real signed-in user's role from the `users` table, this ?role=
-    // param — and the selector below — goes away entirely.
-    router.push(`/dashboard?role=${role}`);
+    router.push("/dashboard");
   }
 
   return (
@@ -75,19 +70,6 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               className="mt-1.5 w-full rounded-lg border border-white/15 bg-navy px-4 py-3 text-white placeholder:text-white/30 focus:border-gold focus:outline-none"
             />
-          </label>
-
-          <label className="mt-4 block">
-            <span className="text-sm text-white/70">Demo: view as role (temporary)</span>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-white/15 bg-navy px-4 py-3 text-white focus:border-gold focus:outline-none"
-            >
-              <option value="director">Director</option>
-              <option value="manager">Manager</option>
-              <option value="employee">Employee</option>
-            </select>
           </label>
 
           <button

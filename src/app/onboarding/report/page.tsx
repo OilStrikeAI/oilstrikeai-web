@@ -2,8 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import OnboardingHeader from "@/components/OnboardingHeader";
 import TierRecommendation from "@/components/TierRecommendation";
-import ReportActions from "@/components/ReportActions";
-import { getTrialAuditData, type DiscrepancyRow } from "@/lib/auditData";
+import { getTrialAuditData, type DiscrepancyRow, type ObligationRow } from "@/lib/auditData";
 
 export const metadata: Metadata = {
   title: "Your Discovery Audit Results — OilStrikeAI",
@@ -95,6 +94,30 @@ function DiscrepancyCard({ d }: { d: DiscrepancyRow }) {
   );
 }
 
+function ObligationCard({ o }: { o: ObligationRow }) {
+  return (
+    <div className="flex items-center justify-between rounded-xl border border-white/10 bg-navy-light p-5">
+      <div>
+        <p className="text-white">{o.title}</p>
+        <p className="mt-1 text-xs text-white/40">Assigned to {o.assigned_team}</p>
+      </div>
+      <span
+        className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${
+          o.severity === "high"
+            ? "bg-red-500/20 text-red-400"
+            : o.severity === "medium"
+            ? "bg-gold/20 text-gold"
+            : "bg-white/10 text-white/50"
+        }`}
+      >
+        {o.due_date
+          ? new Date(o.due_date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+          : "Date not fixed"}
+      </span>
+    </div>
+  );
+}
+
 export default async function ReportPage({
   searchParams,
 }: {
@@ -128,6 +151,12 @@ export default async function ReportPage({
   const dominantCadence = recurringFindings[0]?.recurrence_basis;
   const nonDollarFindings = data.discrepancies.filter((d) => !d.amount);
   const openObligations = data.obligations.filter((o) => o.status === "open");
+
+  const createAccountHref = `/create-account?company=${data.company.id}&email=${encodeURIComponent(
+    data.company.contact_email || ""
+  )}&name=${encodeURIComponent(data.company.contact_name || "")}`;
+
+  const [firstFinding, ...restFindings] = data.discrepancies;
 
   return (
     <div className="flex min-h-screen flex-col bg-navy">
@@ -179,16 +208,38 @@ export default async function ReportPage({
           </p>
         </div>
 
-        <ReportActions auditId={data.company.id} />
+        <p className="mt-6 text-center text-sm text-white/50">
+          Your full findings, deadline calendar, and a downloadable PDF are below — free, no card
+          required, takes about 30 seconds to unlock.
+        </p>
 
         <h2 className="mt-12 font-display text-xl font-semibold text-white">
           Findings ({data.discrepancies.length})
         </h2>
         <div className="mt-4 space-y-4">
-          {data.discrepancies.length > 0 ? (
-            data.discrepancies.map((d) => <DiscrepancyCard key={d.id} d={d} />)
-          ) : (
+          {firstFinding ? <DiscrepancyCard d={firstFinding} /> : (
             <p className="text-white/50">No discrepancies were found in this document.</p>
+          )}
+          {restFindings.length > 0 && (
+            <div className="relative max-h-[180px] overflow-hidden rounded-xl">
+              <div aria-hidden className="pointer-events-none select-none space-y-4 opacity-60 blur-sm">
+                {restFindings.map((d) => (
+                  <DiscrepancyCard key={d.id} d={d} />
+                ))}
+              </div>
+              <div className="absolute inset-0 flex flex-col items-center justify-end gap-4 bg-gradient-to-t from-navy via-navy/90 to-transparent pb-6 pt-6">
+                <p className="text-center text-sm text-white/70">
+                  {restFindings.length} more finding{restFindings.length === 1 ? "" : "s"} waiting —
+                  every one tied to a real clause and page.
+                </p>
+                <Link
+                  href={createAccountHref}
+                  className="inline-block rounded-lg bg-gold px-6 py-3 text-sm font-semibold text-navy shadow-[var(--shadow-gold)] transition hover:bg-gold-light hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold active:translate-y-0"
+                >
+                  Create a free account to see all {data.discrepancies.length} findings
+                </Link>
+              </div>
+            </div>
           )}
         </div>
 
@@ -196,31 +247,30 @@ export default async function ReportPage({
           Key Dates &amp; Deadlines
         </h2>
         <div className="mt-4 space-y-3">
-          {openObligations.length > 0 ? (
-            openObligations.map((o) => (
-              <div
-                key={o.id}
-                className="flex items-center justify-between rounded-xl border border-white/10 bg-navy-light p-5"
-              >
-                <div>
-                  <p className="text-white">{o.title}</p>
-                  <p className="mt-1 text-xs text-white/40">Assigned to {o.assigned_team}</p>
-                </div>
-                <span
-                  className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${
-                    o.severity === "high"
-                      ? "bg-red-500/20 text-red-400"
-                      : o.severity === "medium"
-                      ? "bg-gold/20 text-gold"
-                      : "bg-white/10 text-white/50"
-                  }`}
-                >
-                  {o.due_date ? new Date(o.due_date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "Date not fixed"}
-                </span>
-              </div>
-            ))
-          ) : (
+          {openObligations.length === 0 && (
             <p className="text-white/50">No dated obligations were found in this document.</p>
+          )}
+          {openObligations.length > 0 && <ObligationCard o={openObligations[0]} />}
+          {openObligations.length > 1 && (
+            <div className="relative max-h-[140px] overflow-hidden rounded-xl">
+              <div aria-hidden className="pointer-events-none select-none space-y-3 opacity-60 blur-sm">
+                {openObligations.slice(1).map((o) => (
+                  <ObligationCard key={o.id} o={o} />
+                ))}
+              </div>
+              <div className="absolute inset-0 flex flex-col items-center justify-end gap-4 bg-gradient-to-t from-navy via-navy/90 to-transparent pb-6 pt-6">
+                <p className="text-center text-sm text-white/70">
+                  {openObligations.length - 1} more deadline{openObligations.length - 1 === 1 ? "" : "s"} on your
+                  calendar.
+                </p>
+                <Link
+                  href={createAccountHref}
+                  className="inline-block rounded-lg bg-gold px-6 py-3 text-sm font-semibold text-navy shadow-[var(--shadow-gold)] transition hover:bg-gold-light hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold active:translate-y-0"
+                >
+                  Create a free account to see your full deadline calendar
+                </Link>
+              </div>
+            </div>
           )}
         </div>
 

@@ -32,6 +32,7 @@ export default async function FindingPage({
   }
 
   const topFinding = data.discrepancies[0];
+  const total = data.discrepancies.reduce((sum, d) => sum + (d.amount || 0), 0);
 
   return (
     <div className="flex min-h-screen flex-col bg-navy">
@@ -44,20 +45,26 @@ export default async function FindingPage({
 
         {topFinding ? (
           <div className="mt-6 rounded-2xl border-2 border-gold bg-navy-light p-10 shadow-[var(--shadow-gold)]">
-            <p className="text-white/70">{topFinding.title}</p>
-            <p className="mt-1 font-display text-lg text-white">
-              Reference in original document: {topFinding.page_reference || "n/a"}
-            </p>
-            {topFinding.amount ? (
+            {total > 0 ? (
               <>
-                <p className="mt-6 font-display text-5xl font-semibold text-gold">
-                  ${topFinding.amount.toLocaleString("en-US")}
+                <p className="mt-2 font-display text-5xl font-semibold text-gold">
+                  ${total.toLocaleString("en-US")}
                 </p>
-                <p className="mt-2 text-white/60">in potential exposure</p>
+                <p className="mt-2 text-white/60">
+                  in total potential exposure across {data.discrepancies.length} finding
+                  {data.discrepancies.length === 1 ? "" : "s"}
+                </p>
               </>
             ) : (
-              <p className="mt-6 text-white/70">{topFinding.explanation}</p>
+              <p className="text-white/70">{topFinding.explanation}</p>
             )}
+            <div className="mt-6 border-t border-white/10 pt-6 text-left">
+              <p className="text-xs uppercase tracking-wide text-white/40">For example</p>
+              <p className="mt-2 text-white/80">{topFinding.title}</p>
+              <p className="mt-1 text-sm text-white/50">
+                Reference in original document: {topFinding.page_reference || "n/a"}
+              </p>
+            </div>
           </div>
         ) : (
           <div className="mt-6 rounded-2xl border-2 border-money-green bg-navy-light p-10">
@@ -69,9 +76,9 @@ export default async function FindingPage({
         )}
 
         <p className="mt-8 text-white/50">
-          This is one finding from your first audit. There&apos;s more waiting
-          in your full report — every discrepancy, obligation, and deadline
-          extracted from this document.
+          That&apos;s the number from your full report — every discrepancy, obligation,
+          and deadline extracted from this document is waiting there, with the exact
+          clause and page for each one.
         </p>
 
         <Link

@@ -4,7 +4,7 @@
 // client — no admin client needed here.
 import { NextResponse } from "next/server";
 import { getCurrentUserAndCompany } from "@/lib/serverAuth";
-import { askAssistant, type ChatMessage } from "@/lib/chatAssistant";
+import { streamAssistant, type ChatMessage } from "@/lib/chatAssistant";
 import { logError } from "@/lib/errorLog";
 
 export const maxDuration = 60;
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
 
     const { data: company } = await supabase.from("companies").select("name").eq("id", profile.company_id).maybeSingle();
 
-    const answer = await askAssistant({
+    const tokenStream = streamAssistant({
       context: {
         companyName: company?.name || "your company",
         userName: profile.full_name || user.email || "there",
@@ -105,15 +105,35 @@ export async function POST(request: Request) {
       question,
     });
 
-    const { error: insertError } = await supabase.from("chat_messages").insert([
-      { company_id: profile.company_id, user_id: profile.id, role: "user", content: question },
-      { company_id: profile.company_id, user_id: profile.id, role: "assistant", content: answer },
-    ]);
-    if (insertError) {
-      console.error("[/api/chat] failed to save messages:", insertError);
-    }
+    const encoder = new TextEncoder();
+    let fullAnswer = "";
 
-    return NextResponse.json({ answer });
+    const responseBody = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of tokenStream) {
+            fullAnswer += chunk;
+            controller.enqueue(encoder.encode(chunk));
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+          if (!fullAnswer) {
+            controller.enqueue(encoder.encode(message));
+            fullAnswer = message;
+          }
+        } finally {
+          controller.close();
+          if (fullAnswer) {
+            await supabase.from("chat_messages").insert([
+              { company_id: profile.company_id, user_id: profile.id, role: "user", content: question },
+              { company_id: profile.company_id, user_id: profile.id, role: "assistant", content: fullAnswer },
+            ]);
+          }
+        }
+      },
+    });
+
+    return new Response(responseBody, { headers: { "content-type": "text/plain; charset=utf-8" } });
   } catch (err) {
     console.error("[/api/chat] failed:", err);
     await logError("/api/chat", err, profile.company_id);

@@ -147,6 +147,7 @@ function CreateAccountContent() {
           >
             {submitting ? "Creating account..." : isUpgrade ? "Save My Results" : "Create Account"}
           </button>
+          <p className="mt-3 text-center text-xs text-white/40">Takes about 30 seconds — no card required.</p>
         </form>
 
         <p className="mt-6 text-center text-sm text-white/40">

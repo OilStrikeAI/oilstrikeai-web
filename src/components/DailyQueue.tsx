@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { openChatWithQuestion } from "@/lib/chatWidgetEvents";
+import DelegateAction from "@/components/DelegateAction";
+import AnalyzingPanel from "@/components/AnalyzingPanel";
+import { downloadObligationIcs } from "@/lib/ics";
 
 type Discrepancy = {
   id: string;
@@ -32,7 +35,8 @@ function askAiAbout(d: Discrepancy) {
   openChatWithQuestion(
     `Help me resolve this finding: "${d.title}". ${d.explanation} ${
       d.suggested_next_step ? `The suggested next step is: ${d.suggested_next_step}` : ""
-    } What should I do, step by step?`
+    } What should I do, step by step?`,
+    { discrepancyId: d.id, title: d.title, description: d.explanation }
   );
 }
 
@@ -55,13 +59,16 @@ function FindingCard({ d }: { d: Discrepancy }) {
             <span className="font-semibold text-white/70">Suggestion: </span>
             {d.suggested_next_step}
           </p>
-          <button
-            type="button"
-            onClick={() => askAiAbout(d)}
-            className="shrink-0 rounded-md border border-gold/30 bg-gold/10 px-2.5 py-1.5 text-[11px] font-semibold text-gold transition hover:bg-gold/20"
-          >
-            Use AI to solve this
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => askAiAbout(d)}
+              className="shrink-0 rounded-md border border-gold/30 bg-gold/10 px-2.5 py-1.5 text-[11px] font-semibold text-gold transition hover:bg-gold/20"
+            >
+              Use AI to solve this
+            </button>
+            <DelegateAction discrepancyId={d.id} title={d.title} description={d.explanation} />
+          </div>
         </div>
       )}
     </div>
@@ -197,6 +204,8 @@ export default function DailyQueue({ onUploaded }: { onUploaded?: () => void } =
         </div>
       </div>
 
+      <AnalyzingPanel active={uploading} />
+
       {uploadMessage && (
         <p className="mt-4 rounded-lg border border-white/10 bg-navy px-4 py-3 text-sm text-white/70">
           {uploadMessage}
@@ -259,11 +268,23 @@ export default function DailyQueue({ onUploaded }: { onUploaded?: () => void } =
                   className="flex items-center justify-between rounded-lg border border-white/10 bg-navy px-4 py-3"
                 >
                   <p className="truncate text-sm text-white">{o.title}</p>
-                  <span className="ml-3 whitespace-nowrap text-xs text-white/40">
-                    {o.due_date
-                      ? new Date(o.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
-                      : "No fixed date"}
-                  </span>
+                  <div className="ml-3 flex shrink-0 items-center gap-2">
+                    {o.due_date && (
+                      <button
+                        type="button"
+                        onClick={() => downloadObligationIcs({ title: o.title, dueDate: o.due_date! })}
+                        title="Add to calendar"
+                        className="rounded-md border border-white/15 px-2 py-1 text-xs text-white/50 transition hover:border-gold/40 hover:text-gold"
+                      >
+                        + Calendar
+                      </button>
+                    )}
+                    <span className="whitespace-nowrap text-xs text-white/40">
+                      {o.due_date
+                        ? new Date(o.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                        : "No fixed date"}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>

@@ -5,6 +5,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePageTitle } from "@/lib/usePageTitle";
 import ActivityLog from "@/components/ActivityLog";
 import ExplainabilityDrawer, { type RealDiscrepancy } from "@/components/ExplainabilityDrawer";
+import DelegateAction from "@/components/DelegateAction";
+import AnalyzingPanel from "@/components/AnalyzingPanel";
+import { downloadObligationIcs } from "@/lib/ics";
 import { useDashboardSummary, type DashboardSummary } from "@/lib/dashboardContext";
 import { openChatWithQuestion } from "@/lib/chatWidgetEvents";
 
@@ -12,7 +15,8 @@ function askAiAbout(d: RealDiscrepancy) {
   openChatWithQuestion(
     `Help me resolve this finding: "${d.title}". ${d.explanation} ${
       d.suggested_next_step ? `The suggested next step is: ${d.suggested_next_step}` : ""
-    } What should I do, step by step?`
+    } What should I do, step by step?`,
+    { discrepancyId: d.id, title: d.title, description: d.explanation }
   );
 }
 
@@ -161,6 +165,8 @@ function AnalyzeDocumentCard({ onAnalyzed }: { onAnalyzed: () => void }) {
           </button>
         </div>
       </div>
+
+      <AnalyzingPanel active={uploading} />
 
       {message && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-navy px-4 py-3">
@@ -369,6 +375,48 @@ async function resolveDiscrepancy(id: string, reload: () => void) {
   reload();
 }
 
+type EscalatedTask = {
+  id: string;
+  title: string;
+  description: string | null;
+  due_date: string | null;
+  assignedByName: string;
+};
+
+function EscalatedToYou() {
+  const [tasks, setTasks] = useState<EscalatedTask[] | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/tasks/escalated", { signal: controller.signal })
+      .then((res) => res.json())
+      .then((json) => setTasks(json.tasks ?? []))
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+
+  return (
+    <div>
+      <h2 className="font-display text-lg font-semibold text-white">Escalated to you</h2>
+      <p className="mt-1 text-sm text-white/40">
+        Findings a manager sent straight to you because they need your call.
+      </p>
+      <div className="mt-3 space-y-3">
+        {tasks === null && <p className="text-sm text-white/40">Loading...</p>}
+        {tasks?.length === 0 && (
+          <p className="text-sm text-white/40">Nothing has been escalated to you right now.</p>
+        )}
+        {tasks?.map((t) => (
+          <div key={t.id} className="rounded-xl border border-red-500/30 bg-red-500/5 p-5">
+            <p className="text-white">{t.title.replace(/^Escalated:\s*/, "")}</p>
+            <p className="mt-1 text-xs text-white/40">Escalated by {t.assignedByName}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DirectorView({ queue, summary }: { queue: QueueData; summary: DashboardSummary | null }) {
   const highSeverity = queue.obligations.filter((o) => o.severity === "high" && o.status === "open");
 
@@ -383,8 +431,10 @@ function DirectorView({ queue, summary }: { queue: QueueData; summary: Dashboard
 
       <RiskScoreCard summary={summary} />
 
+      <EscalatedToYou />
+
       <div>
-        <h2 className="font-display text-lg font-semibold text-white">Escalated to you</h2>
+        <h2 className="font-display text-lg font-semibold text-white">Most urgent deadlines</h2>
         <div className="mt-3 space-y-3">
           {queue.loading && <p className="text-sm text-white/40">Loading...</p>}
           {!queue.loading && highSeverity.length === 0 && (
@@ -398,9 +448,21 @@ function DirectorView({ queue, summary }: { queue: QueueData; summary: Dashboard
                   <p className="text-white">{o.title}</p>
                   <p className="mt-1 text-xs text-white/40">Assigned to {o.assigned_team}</p>
                 </div>
-                <span className="rounded-full bg-red-500/20 px-3 py-1 text-xs font-semibold text-red-400">
-                  {due != null ? (due >= 0 ? `Due in ${due} days` : `${Math.abs(due)} days overdue`) : "No fixed date"}
-                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                  {o.due_date && (
+                    <button
+                      type="button"
+                      onClick={() => downloadObligationIcs({ title: o.title, dueDate: o.due_date! })}
+                      title="Add to calendar"
+                      className="rounded-md border border-white/15 px-2 py-1 text-xs text-white/50 transition hover:border-gold/40 hover:text-gold"
+                    >
+                      + Calendar
+                    </button>
+                  )}
+                  <span className="rounded-full bg-red-500/20 px-3 py-1 text-xs font-semibold text-red-400">
+                    {due != null ? (due >= 0 ? `Due in ${due} days` : `${Math.abs(due)} days overdue`) : "No fixed date"}
+                  </span>
+                </div>
               </div>
             );
           })}
@@ -447,12 +509,15 @@ function ManagerView({ queue }: { queue: QueueData }) {
                     <span className="font-semibold text-white">Suggestion: </span>
                     {d.suggested_next_step}
                   </p>
-                  <button
-                    onClick={() => askAiAbout(d)}
-                    className="shrink-0 rounded-md border border-gold/30 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/20"
-                  >
-                    Use AI to solve this
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => askAiAbout(d)}
+                      className="shrink-0 rounded-md border border-gold/30 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/20"
+                    >
+                      Use AI to solve this
+                    </button>
+                    <DelegateAction discrepancyId={d.id} title={d.title} description={d.explanation} />
+                  </div>
                 </div>
               )}
               <div className="mt-4 flex flex-wrap gap-3">

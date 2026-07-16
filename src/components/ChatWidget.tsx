@@ -2,10 +2,16 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { OPEN_CHAT_EVENT } from "@/lib/chatWidgetEvents";
+import { OPEN_CHAT_EVENT, type ChatDiscrepancyContext } from "@/lib/chatWidgetEvents";
 import { useDashboardSummary } from "@/lib/dashboardContext";
+import DelegateAction from "@/components/DelegateAction";
 
-type Message = { id?: string; role: "user" | "assistant"; content: string };
+type Message = {
+  id?: string;
+  role: "user" | "assistant";
+  content: string;
+  discrepancyContext?: ChatDiscrepancyContext;
+};
 
 const SUGGESTIONS = [
   "What's our biggest open discrepancy?",
@@ -22,14 +28,17 @@ export default function ChatWidget() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
+  const [pendingQuestion, setPendingQuestion] = useState<{
+    question: string;
+    context?: ChatDiscrepancyContext;
+  } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleOpenChat(e: Event) {
-      const detail = (e as CustomEvent<{ question: string }>).detail;
+      const detail = (e as CustomEvent<{ question: string; context?: ChatDiscrepancyContext }>).detail;
       setOpen(true);
-      if (detail?.question) setPendingQuestion(detail.question);
+      if (detail?.question) setPendingQuestion({ question: detail.question, context: detail.context });
     }
     window.addEventListener(OPEN_CHAT_EVENT, handleOpenChat);
     return () => window.removeEventListener(OPEN_CHAT_EVENT, handleOpenChat);
@@ -66,11 +75,15 @@ export default function ChatWidget() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  async function handleSend(question: string) {
+  async function handleSend(question: string, context?: ChatDiscrepancyContext) {
     const trimmed = question.trim();
     if (!trimmed || sending) return;
 
-    setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: trimmed },
+      { role: "assistant", content: "", discrepancyContext: context },
+    ]);
     setInput("");
     setSending(true);
     setError(null);
@@ -81,10 +94,31 @@ export default function ChatWidget() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ question: trimmed }),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Something went wrong. Please try again.");
-      setMessages((prev) => [...prev, { role: "assistant", content: json.answer }]);
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || "Something went wrong. Please try again.");
+      }
+      if (!res.body) throw new Error("Something went wrong. Please try again.");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        accumulated += decoder.decode(value, { stream: true });
+        const text = accumulated;
+        setMessages((prev) => {
+          const next = [...prev];
+          next[next.length - 1] = { ...next[next.length - 1], content: text };
+          return next;
+        });
+      }
+
+      if (!accumulated) throw new Error("The assistant did not return a text reply.");
     } catch (err) {
+      setMessages((prev) => prev.slice(0, -1));
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {
       setSending(false);
@@ -93,13 +127,13 @@ export default function ChatWidget() {
 
   useEffect(() => {
     if (status !== "ready" || !pendingQuestion) return;
-    const question = pendingQuestion;
+    const { question, context } = pendingQuestion;
     // Clearing the pending question and firing the send both happen here,
     // synchronously, in response to the widget finishing its load — this is
     // the intended one-shot "auto-ask" behavior, not an accidental loop.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPendingQuestion(null);
-    handleSend(question);
+    handleSend(question, context);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, pendingQuestion]);
 
@@ -186,19 +220,30 @@ export default function ChatWidget() {
                   </div>
                 )}
 
-                {messages.map((m, i) => (
-                  <div key={m.id ?? i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                    <div
-                      className={`max-w-[85%] whitespace-pre-wrap rounded-xl px-3.5 py-2.5 text-sm ${
-                        m.role === "user" ? "bg-gold text-navy" : "border border-white/10 bg-navy text-white/90"
-                      }`}
-                    >
-                      {m.content}
+                {messages
+                  .filter((m) => m.role === "user" || m.content !== "")
+                  .map((m, i) => (
+                    <div key={m.id ?? i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
+                      <div
+                        className={`max-w-[85%] whitespace-pre-wrap rounded-xl px-3.5 py-2.5 text-sm ${
+                          m.role === "user" ? "bg-gold text-navy" : "border border-white/10 bg-navy text-white/90"
+                        }`}
+                      >
+                        {m.content}
+                      </div>
+                      {m.role === "assistant" && m.content && m.discrepancyContext && (
+                        <div className="mt-2">
+                          <DelegateAction
+                            discrepancyId={m.discrepancyContext.discrepancyId}
+                            title={m.discrepancyContext.title}
+                            description={m.discrepancyContext.description}
+                          />
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  ))}
 
-                {sending && (
+                {sending && messages[messages.length - 1]?.content === "" && (
                   <div className="flex justify-start">
                     <div className="max-w-[85%] rounded-xl border border-white/10 bg-navy px-3.5 py-2.5 text-sm text-white/40">
                       <span className="animate-pulse">Thinking...</span>
