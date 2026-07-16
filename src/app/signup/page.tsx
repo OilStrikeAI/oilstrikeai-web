@@ -59,7 +59,7 @@ export default function SignupPage() {
           </div>
           <div className="grid gap-5 sm:grid-cols-2">
             <Field name="email" label="Work email" type="email" placeholder="you@company.com" required />
-            <Field name="whatsapp" label="WhatsApp number" placeholder="+234 800 000 0000" required />
+            <Field name="whatsapp" label="WhatsApp number (optional)" placeholder="+234 800 000 0000" />
           </div>
 
           <div className="rounded-xl border border-white/10 bg-navy-light p-6">

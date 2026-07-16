@@ -235,52 +235,77 @@ export async function analyzeDocument(params: {
   // that actually accept it.
   const supportsTemperature = modelToUse !== ANALYSIS_MODEL;
 
-  const response = await fetch(ANTHROPIC_API_URL, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: modelToUse,
-      max_tokens: 8000,
-      ...(supportsTemperature ? { temperature: 0 } : {}),
-      // The system prompt and tool schema are identical on every single call
-      // (only the document itself changes) — marking them cacheable means
-      // repeat calls only pay full price for the new document, not for
-      // re-sending the same few thousand tokens of instructions every time.
-      system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "document",
-              source: {
-                type: "base64",
-                media_type: "application/pdf",
-                data: params.pdfBase64,
-              },
+  const requestBody = JSON.stringify({
+    model: modelToUse,
+    max_tokens: 8000,
+    ...(supportsTemperature ? { temperature: 0 } : {}),
+    // The system prompt and tool schema are identical on every single call
+    // (only the document itself changes) — marking them cacheable means
+    // repeat calls only pay full price for the new document, not for
+    // re-sending the same few thousand tokens of instructions every time.
+    system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "document",
+            source: {
+              type: "base64",
+              media_type: "application/pdf",
+              data: params.pdfBase64,
             },
-            {
-              type: "text",
-              text: `Analyze "${params.fileName}" per your instructions and call record_audit_findings with your complete findings.`,
-            },
-          ],
-        },
-      ],
-      tools: [{ ...RECORD_FINDINGS_TOOL, cache_control: { type: "ephemeral" } }],
-      tool_choice: { type: "tool", name: "record_audit_findings" },
-    }),
+          },
+          {
+            type: "text",
+            text: `Analyze "${params.fileName}" per your instructions and call record_audit_findings with your complete findings.`,
+          },
+        ],
+      },
+    ],
+    tools: [{ ...RECORD_FINDINGS_TOOL, cache_control: { type: "ephemeral" } }],
+    tool_choice: { type: "tool", name: "record_audit_findings" },
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Anthropic API error ${response.status}: ${errorText}`);
+  // Anthropic's API occasionally returns a transient 429/500/503/529 (server
+  // overloaded) that has nothing to do with the document itself — retrying
+  // a couple of times with backoff turns a real-user-facing failure into a
+  // few extra seconds of "Analyzing...", instead of surfacing a raw API
+  // error on the very first hiccup.
+  const RETRYABLE_STATUSES = new Set([429, 500, 503, 529]);
+  const MAX_ATTEMPTS = 3;
+  let lastErrorText = "";
+  let lastStatus = 0;
+  let response: Response | null = null;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    response = await fetch(ANTHROPIC_API_URL, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: requestBody,
+    });
+
+    if (response.ok) break;
+
+    lastStatus = response.status;
+    lastErrorText = await response.text();
+
+    if (attempt < MAX_ATTEMPTS && RETRYABLE_STATUSES.has(response.status)) {
+      await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+      continue;
+    }
+
+    console.error(`[documentAnalysis] Anthropic API error ${lastStatus} after ${attempt} attempt(s): ${lastErrorText}`);
+    throw new Error(
+      "The document analysis service is temporarily unavailable. Please try again in a minute — this is a rare, transient issue, not a problem with your document."
+    );
   }
 
-  const data = await response.json();
+  const data = await response!.json();
   const toolUse = (data.content as Array<Record<string, unknown>>)?.find(
     (block) => block.type === "tool_use" && block.name === "record_audit_findings"
   );
